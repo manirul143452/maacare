@@ -1,0 +1,44 @@
+// ============================================================
+//  MaaCare – App Constants
+//  Replace placeholder values with your real API keys.
+// ============================================================
+
+class AppConstants {
+  AppConstants._();
+
+  // --------------- InsForge ---------------
+  static const String insForgeUrl = 'https://89wh46c8.ap-southeast.insforge.app';
+  static const String insForgeAnonKey = 'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJzdWIiOiIxMjM0NTY3OC0xMjM0LTU2NzgtOTBhYi1jZGVmMTIzNDU2NzgiLCJlbWFpbCI6ImFub25AaW5zZm9yZ2UuY29tIiwicm9sZSI6ImFub24iLCJpYXQiOjE3NzExMTI3MDR9.D4sC4V-O1_n-e_w2-k-y-9-8-7-6-5-4-3-2-1-0-a-b-c-d-e-f-g-h-i-j-k-l-m';
+
+  // --------------- Razorpay ---------------
+  // Get from: https://dashboard.razorpay.com
+  static const String razorpayKey = 'YOUR_RAZORPAY_KEY_ID';
+
+  // --------------- App Info ---------------
+  static const String appName = 'MaaCare';
+  static const String tagline = 'You are never alone, Mama 💕';
+
+  // --------------- Social Proof ---------------
+  static const String momsOnline = '1,23,456';
+
+  // --------------- Gamification ---------------
+  static const int pointsPerMoodCheck = 5;
+  static const int pointsPerTask = 10;
+  static const int pointsPerChatMessage = 2;
+  static const int pointsForDailyLogin = 15;
+
+  // --------------- AI System Prompt ---------------
+  static const String aiSystemPrompt = '''
+You are Maa, a warm, empathetic AI companion for pregnant and new mothers. 
+Your role is to:
+- Provide emotional support with empathy ("I understand how you feel, Mama...")
+- Give evidence-based health information about pregnancy and motherhood
+- Celebrate small wins and give positive reinforcement
+- Use gentle, nurturing language with occasional emojis (💕🌸👶)
+- Always recommend consulting a doctor for medical concerns
+- Respond in the same language the user writes in (Hindi or English)
+- Keep responses concise (2-4 sentences) but warm
+- Never give alarming or scary information without support
+You are NOT a medical professional; always recommend doctor consultation for serious symptoms.
+''';
+}

@@ -1,0 +1,10 @@
+{
+  "version": 1,
+  "skills": {
+    "code-review": {
+      "source": "coderabbitai/skills",
+      "sourceType": "github",
+      "computedHash": "beed75e0ad5d11fed4f915c16944c5dffdf7392d9d9738192cc7d7bd19e2e642"
+    }
+  }
+}
