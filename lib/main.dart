@@ -1,10 +1,12 @@
 // ============================================================
 //  main.dart – MaaCare Entry Point
+//  Premium dark theme with smooth transitions
 // ============================================================
 
 import 'package:flutter/material.dart';
 import 'package:provider/provider.dart';
 import 'services/insforge_service.dart';
+import 'screens/onboarding/welcome_screen.dart';
 import 'app_theme.dart';
 import 'constants.dart';
 import 'providers/user_provider.dart';
@@ -58,9 +60,13 @@ class MaaCareApp extends StatelessWidget {
       child: MaterialApp(
         title: AppConstants.appName,
         debugShowCheckedModeBanner: false,
-        theme: MaaTheme.lightTheme,
-        initialRoute: '/splash',
+        theme: MaaTheme.darkTheme,
+        darkTheme: MaaTheme.darkTheme,
+        themeMode: ThemeMode.dark,
+        initialRoute: '/welcome',
+        onGenerateRoute: _generateRoute,
         routes: {
+          '/welcome': (_) => const WelcomeScreen(),
           '/splash': (_) => const SplashScreen(),
           '/onboarding': (_) => const OnboardingScreen(),
           '/privacy': (_) => const PrivacyPolicyScreen(),
@@ -79,10 +85,59 @@ class MaaCareApp extends StatelessWidget {
           '/selfcare': (_) => const SelfCareScreen(),
           '/vaccinations': (_) => const VaccinationTrackerScreen(),
           '/nutrition': (_) => const NutritionGuideScreen(),
-          '/family': (_) => const FamilyPlanningScreen(),
-          '/profile': (_) => const ProfileScreen(),
         },
       ),
+    );
+  }
+
+  Route<dynamic>? _generateRoute(RouteSettings settings) {
+    // Default fade transition for all routes
+    return PageRouteBuilder(
+      settings: settings,
+      pageBuilder: (context, animation, secondaryAnimation) {
+        // Return the appropriate screen based on route name
+        switch (settings.name) {
+          case '/welcome':
+            return const WelcomeScreen();
+          case '/splash':
+            return const SplashScreen();
+          case '/onboarding':
+            return const OnboardingScreen();
+          case '/home':
+            return const HomeScreen();
+          case '/chat':
+            return const AiChatScreen();
+          case '/tracker':
+            return const PregnancyTrackerScreen();
+          case '/profile':
+            return const ProfileScreen();
+          case '/community':
+            return const ParentsParkScreen();
+          default:
+            return const SplashScreen();
+        }
+      },
+      transitionsBuilder: (context, animation, secondaryAnimation, child) {
+        // Smooth fade transition with subtle slide
+        return FadeTransition(
+          opacity: CurvedAnimation(
+            parent: animation,
+            curve: Curves.easeOutCubic,
+          ),
+          child: SlideTransition(
+            position: Tween<Offset>(
+              begin: const Offset(0.05, 0),
+              end: Offset.zero,
+            ).animate(CurvedAnimation(
+              parent: animation,
+              curve: Curves.easeOutCubic,
+            )),
+            child: child,
+          ),
+        );
+      },
+      transitionDuration: const Duration(milliseconds: 400),
+      reverseTransitionDuration: const Duration(milliseconds: 300),
     );
   }
 }

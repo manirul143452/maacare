@@ -238,8 +238,51 @@ class InsForgeService {
     await http.patch(
       url,
       headers: _headers,
-      body: jsonEncode({'likes': currentLikes + 1}),
+      body: jsonEncode({'likes': currentLikes}),
     );
+  }
+
+  // ─────────────────── Replies ───────────────────
+
+  Future<List<Map<String, dynamic>>> fetchReplies(String postId) async {
+    final url = Uri.parse('$_baseUrl/api/database/records/replies?post_id=eq.$postId&order=created_at.asc');
+    final response = await http.get(url, headers: _headers);
+
+    if (response.statusCode == 200) {
+      final List data = jsonDecode(response.body);
+      return data.cast<Map<String, dynamic>>();
+    }
+    return [];
+  }
+
+  Future<Map<String, dynamic>?> createReply({
+    required String postId,
+    required String userId,
+    required String content,
+    String? authorName,
+    bool anonymous = true,
+  }) async {
+    final url = Uri.parse('$_baseUrl/api/database/records/replies');
+    final response = await http.post(
+      url,
+      headers: {
+        ..._headers,
+        'Prefer': 'return=representation',
+      },
+      body: jsonEncode([{
+        'post_id': postId,
+        'user_id': userId,
+        'content': content,
+        'author_name': authorName,
+        'anonymous': anonymous,
+      }]),
+    );
+
+    if (response.statusCode == 201 || response.statusCode == 200) {
+      final List data = jsonDecode(response.body);
+      if (data.isNotEmpty) return data.first;
+    }
+    return null;
   }
 
   // ─────────────────── Symptoms ───────────────────

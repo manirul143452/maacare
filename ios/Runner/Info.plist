@@ -45,5 +45,13 @@
 	<true/>
 	<key>UIApplicationSupportsIndirectInputEvents</key>
 	<true/>
+
+	<!-- MaaCare Privacy Permissions -->
+	<key>NSCameraUsageDescription</key>
+	<string>MaaCare needs camera access to help you share symptoms and prescriptions with AI and doctors.</string>
+	<key>NSPhotoLibraryUsageDescription</key>
+	<string>MaaCare needs photo library access to upload prescriptions and community posts.</string>
+	<key>NSMicrophoneUsageDescription</key>
+	<string>MaaCare needs microphone access if you wish to record videos for the community.</string>
 </dict>
 </plist>

@@ -10,6 +10,11 @@ class AppConstants {
   static const String insForgeUrl = 'https://89wh46c8.ap-southeast.insforge.app';
   static const String insForgeAnonKey = 'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJzdWIiOiIxMjM0NTY3OC0xMjM0LTU2NzgtOTBhYi1jZGVmMTIzNDU2NzgiLCJlbWFpbCI6ImFub25AaW5zZm9yZ2UuY29tIiwicm9sZSI6ImFub24iLCJpYXQiOjE3NzExMTI3MDR9.D4sC4V-O1_n-e_w2-k-y-9-8-7-6-5-4-3-2-1-0-a-b-c-d-e-f-g-h-i-j-k-l-m';
 
+  // --------------- xAI Grok (Fallback AI) ---------------
+  static const String xaiApiKey = 'YOUR_XAI_API_KEY';
+  static const String xaiBaseUrl = 'https://api.x.ai/v1/chat/completions';
+  static const String xaiModel = 'grok-4-latest';
+
   // --------------- Razorpay ---------------
   // Get from: https://dashboard.razorpay.com
   static const String razorpayKey = 'YOUR_RAZORPAY_KEY_ID';
@@ -24,6 +29,7 @@ class AppConstants {
   // --------------- Gamification ---------------
   static const int pointsPerMoodCheck = 5;
   static const int pointsPerTask = 10;
+  static const int pointsPerPost = 10;
   static const int pointsPerChatMessage = 2;
   static const int pointsForDailyLogin = 15;
 

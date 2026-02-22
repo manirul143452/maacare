@@ -55,6 +55,7 @@ class PostModel {
       'content': content,
       'week_tag': weekTag,
       'anonymous': anonymous,
+      'author_name': authorName,
       if (imageUrl != null) 'image_url': imageUrl,
       if (videoUrl != null) 'video_url': videoUrl,
     };

@@ -138,7 +138,7 @@ class ChatProvider extends ChangeNotifier {
       final history = _messages.take(10).map((m) => {
         'role': m.role,
         'content': m.content,
-      }).toList();
+      }).toList().cast<Map<String, String>>();
 
       final aiResponse = await AIService.instance.getChatResponse(history);
 
