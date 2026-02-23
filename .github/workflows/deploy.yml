@@ -16,31 +16,29 @@ jobs:
       - name: Setup Flutter
         uses: subosito/flutter-action@v2
         with:
-          flutter-version: '3.19.0'
+          flutter-version: '3.24.0'
           channel: 'stable'
+          cache: true # Enable caching for faster builds
           
       - name: Get dependencies
         run: flutter pub get
         
-      - name: Build web
-        run: flutter build web --release
-        
+      - name: Build Web (Release)
+        run: |
+          flutter build web --release --no-tree-shake-icons --web-renderer canvaskit
+          
       - name: Deploy to InsForge
         env:
-          INSFORGE_URL: ${{ secrets.INSFORGE_URL }}
-          INSFORGE_ANON_KEY: ${{ secrets.INSFORGE_ANON_KEY }}
+          # These must be set in GitHub Settings > Secrets and Variables > Actions
+          INSFORGE_API_KEY: ${{ secrets.INSFORGE_API_KEY }}
+          INSFORGE_PROJECT_ID: "89wh46c8"
         run: |
-          # Deploy using InsForge API
-          cd build/web
-          # Create deployment
-          curl -X POST "${INSFORGE_URL}/rest/v1/rpc/deploy_frontend" \
-            -H "Content-Type: application/json" \
-            -H "apikey: ${INSFORGE_ANON_KEY}" \
-            -H "Authorization: Bearer ${INSFORGE_ANON_KEY}" \
-            -d '{"project_name": "maacare"}'
-            
-      - name: Upload build artifacts
+          # Use official InsForge CLI for deployment
+          # The CLI handles zipping and uploading build/web automatically
+          npx @insforge/cli deploy --project $INSFORGE_PROJECT_ID --dir build/web --token $INSFORGE_API_KEY
+          
+      - name: Upload Build Artifacts
         uses: actions/upload-artifact@v4
         with:
-          name: web-build
+          name: maacare-web-build
           path: build/web/
