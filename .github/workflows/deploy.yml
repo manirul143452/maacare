@@ -1,0 +1,46 @@
+name: Build and Deploy to InsForge
+
+on:
+  push:
+    branches: [main]
+  workflow_dispatch:
+
+jobs:
+  build-and-deploy:
+    runs-on: ubuntu-latest
+    
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@v4
+        
+      - name: Setup Flutter
+        uses: subosito/flutter-action@v2
+        with:
+          flutter-version: '3.19.0'
+          channel: 'stable'
+          
+      - name: Get dependencies
+        run: flutter pub get
+        
+      - name: Build web
+        run: flutter build web --release
+        
+      - name: Deploy to InsForge
+        env:
+          INSFORGE_URL: ${{ secrets.INSFORGE_URL }}
+          INSFORGE_ANON_KEY: ${{ secrets.INSFORGE_ANON_KEY }}
+        run: |
+          # Deploy using InsForge API
+          cd build/web
+          # Create deployment
+          curl -X POST "${INSFORGE_URL}/rest/v1/rpc/deploy_frontend" \
+            -H "Content-Type: application/json" \
+            -H "apikey: ${INSFORGE_ANON_KEY}" \
+            -H "Authorization: Bearer ${INSFORGE_ANON_KEY}" \
+            -d '{"project_name": "maacare"}'
+            
+      - name: Upload build artifacts
+        uses: actions/upload-artifact@v4
+        with:
+          name: web-build
+          path: build/web/
