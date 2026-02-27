@@ -8,6 +8,7 @@ import '../../app_theme.dart';
 import '../../models/user_model.dart';
 import '../../providers/user_provider.dart';
 import '../../widgets/maa_button.dart';
+import '../../services/insforge_service.dart';
 
 class OnboardingScreen extends StatefulWidget {
   const OnboardingScreen({super.key});
@@ -85,7 +86,14 @@ class _OnboardingScreenState extends State<OnboardingScreen> {
     setState(() => _isSubmitting = true);
 
     try {
-      final userId = const Uuid().v4();
+      // Get the real user ID from InsForge Auth
+      final currentUser = await context.read<UserProvider>().loadUser().then((_) => context.read<UserProvider>().user == null ? InsForgeService.instance.getCurrentUser() : null);
+      
+      final String? userId = (await InsForgeService.instance.getCurrentUser())?['id'];
+
+      if (userId == null) {
+        throw Exception('User not authenticated');
+      }
 
       final user = UserModel(
         id: userId,

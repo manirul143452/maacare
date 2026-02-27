@@ -95,6 +95,18 @@ class InsForgeService {
 
   bool get isLoggedIn => _accessToken != null;
 
+  Future<Map<String, dynamic>?> getCurrentUser() async {
+    if (_accessToken == null) return null;
+    final url = Uri.parse('$_baseUrl/api/auth/sessions/current');
+    final response = await http.get(url, headers: _headers);
+
+    if (response.statusCode == 200) {
+      final data = jsonDecode(response.body);
+      return data['user'];
+    }
+    return null;
+  }
+
   // ─────────────────── User Profile ───────────────────
 
   Future<void> upsertUser(UserModel user) async {

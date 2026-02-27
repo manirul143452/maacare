@@ -8,7 +8,8 @@ class AppConstants {
 
   // --------------- InsForge ---------------
   static const String insForgeUrl = 'https://89wh46c8.ap-southeast.insforge.app';
-  static const String insForgeAnonKey = 'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJzdWIiOiIxMjM0NTY3OC0xMjM0LTU2NzgtOTBhYi1jZGVmMTIzNDU2NzgiLCJlbWFpbCI6ImFub25AaW5zZm9yZ2UuY29tIiwicm9sZSI6ImFub24iLCJpYXQiOjE3NzExMTI3MDR9.D4sC4V-O1_n-e_w2-k-y-9-8-7-6-5-4-3-2-1-0-a-b-c-d-e-f-g-h-i-j-k-l-m';
+  static const String insForgeAnonKey = 'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJzdWIiOiIxMjM0NTY3OC0xMjM0LTU2NzgtOTBhYi1jZGVmMTIzNDU2NzgiLCJlbWFpbCI6ImFub25AaW5zZm9yZ2UuY29tIiwicm9sZSI6ImFub24iLCJpYXQiOjE3NzIxOTIwNTl9.SLLS5l17GTbYkZNe3zEHFV5KauWxF-ctjFsI3l7Dtqg';
+
 
   // --------------- xAI Grok (Fallback AI) ---------------
   static const String xaiApiKey = 'YOUR_XAI_API_KEY';

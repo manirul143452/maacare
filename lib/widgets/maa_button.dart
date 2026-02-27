@@ -16,6 +16,7 @@ class MaaButton extends StatelessWidget {
   final bool outlined;
   final IconData? icon;
   final double? width;
+  final Color? color;
 
   const MaaButton({
     super.key,
@@ -25,6 +26,7 @@ class MaaButton extends StatelessWidget {
     this.outlined = false,
     this.icon,
     this.width,
+    this.color,
   });
 
   @override
@@ -34,31 +36,37 @@ class MaaButton extends StatelessWidget {
       height: 52,
       child: outlined
           ? OutlinedButton.icon(
+              style: OutlinedButton.styleFrom(
+                side: BorderSide(color: color ?? MaaColors.pink, width: 1.5),
+                foregroundColor: color ?? MaaColors.pink,
+              ),
               onPressed: isLoading ? null : onPressed,
               icon: icon != null
                   ? Icon(icon, size: 20)
                   : const SizedBox.shrink(),
               label: isLoading
-                  ? const SizedBox(
+                  ? SizedBox(
                       width: 20,
                       height: 20,
                       child: CircularProgressIndicator(
                           strokeWidth: 2,
-                          color: MaaColors.deepPink),
+                          color: color ?? MaaColors.deepPink),
                     )
                   : Text(label),
             )
           : DecoratedBox(
               decoration: BoxDecoration(
-                gradient: onPressed == null || isLoading
-                    ? const LinearGradient(
-                        colors: [MaaColors.pink, MaaColors.pink])
-                    : MaaColors.primaryGradient,
+                color: outlined ? null : color,
+                gradient: color != null 
+                    ? null 
+                    : (onPressed == null || isLoading
+                        ? const LinearGradient(colors: [MaaColors.pink, MaaColors.pink])
+                        : MaaColors.primaryGradient),
                 borderRadius: BorderRadius.circular(30),
                 boxShadow: onPressed != null && !isLoading
                     ? [
                         BoxShadow(
-                          color: MaaColors.deepPink.withAlpha(80),
+                          color: (color ?? MaaColors.deepPink).withAlpha(80),
                           blurRadius: 12,
                           offset: const Offset(0, 4),
                         )

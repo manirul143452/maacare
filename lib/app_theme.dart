@@ -5,6 +5,7 @@
 
 import 'package:flutter/material.dart';
 import 'package:google_fonts/google_fonts.dart';
+import 'package:flutter_animate/flutter_animate.dart';
 
 class MaaColors {
   MaaColors._();
@@ -19,6 +20,7 @@ class MaaColors {
   static const Color pink = Color(0xFFFF69B4);
   static const Color pinkGlow = Color(0xFFFF69B4);
   static const Color pinkDark = Color(0xFFE91E8C);
+  static const Color deepPink = Color(0xFFD81B60);
   static const Color gold = Color(0xFFFFD700);
   static const Color goldDark = Color(0xFFFFB347);
   
@@ -35,6 +37,7 @@ class MaaColors {
   static const Color textSecondary = Color(0xFFB0B0C0);
   static const Color textMuted = Color(0xFF6B6B80);
   static const Color textDark = Color(0xFF3D1A2E);
+  static const Color textGrey = Color(0xFF9E9E9E);
   
   // ── Status Colors ──
   static const Color success = Color(0xFF4CAF50);
@@ -90,6 +93,7 @@ class MaaColors {
   static Color goldShadow = gold.withAlpha(60);
   static Color purpleShadow = softPurple.withAlpha(60);
   static Color darkShadow = Colors.black.withAlpha(80);
+  static Color cardShadow = Colors.black.withAlpha(40);
 }
 
 class MaaTheme {

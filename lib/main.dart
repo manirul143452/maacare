@@ -13,6 +13,7 @@ import 'providers/user_provider.dart';
 import 'providers/chat_provider.dart';
 import 'providers/community_provider.dart';
 import 'services/notification_service.dart';
+import 'screens/onboarding/auth_screen.dart';
 
 // Screens
 import 'screens/splash_screen.dart';
@@ -67,6 +68,7 @@ class MaaCareApp extends StatelessWidget {
         onGenerateRoute: _generateRoute,
         routes: {
           '/welcome': (_) => const WelcomeScreen(),
+          '/auth': (_) => const AuthScreen(),
           '/splash': (_) => const SplashScreen(),
           '/onboarding': (_) => const OnboardingScreen(),
           '/privacy': (_) => const PrivacyPolicyScreen(),
@@ -99,6 +101,8 @@ class MaaCareApp extends StatelessWidget {
         switch (settings.name) {
           case '/welcome':
             return const WelcomeScreen();
+          case '/auth':
+            return const AuthScreen();
           case '/splash':
             return const SplashScreen();
           case '/onboarding':

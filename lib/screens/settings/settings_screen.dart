@@ -4,8 +4,10 @@
 // ============================================================
 
 import 'package:flutter/material.dart';
+import 'package:provider/provider.dart';
 import '../../app_theme.dart';
 import '../../widgets/maa_button.dart';
+import '../../providers/user_provider.dart';
 
 class SettingsScreen extends StatefulWidget {
   const SettingsScreen({super.key});
@@ -76,9 +78,39 @@ class _SettingsScreenState extends State<SettingsScreen> {
             outlined: true,
             onPressed: _showDeletionConfirm,
           ),
+          const SizedBox(height: 16),
+          MaaButton(
+            label: 'Sign Out 🚪',
+            onPressed: _handleSignOut,
+            color: Colors.redAccent,
+          ),
         ],
       ),
     );
+  }
+
+  Future<void> _handleSignOut() async {
+    final confirmed = await showDialog<bool>(
+      context: context,
+      builder: (ctx) => AlertDialog(
+        title: const Text('Sign Out? 🚪'),
+        content: const Text('Are you sure you want to sign out, Mama? We\'ll be here waiting for you!'),
+        actions: [
+          TextButton(onPressed: () => Navigator.pop(ctx, false), child: const Text('Stay')),
+          TextButton(
+            onPressed: () => Navigator.pop(ctx, true),
+            child: const Text('Sign Out', style: TextStyle(color: Colors.red)),
+          ),
+        ],
+      ),
+    );
+
+    if (confirmed == true && mounted) {
+      await context.read<UserProvider>().signOut();
+      if (mounted) {
+        Navigator.pushNamedAndRemoveUntil(context, '/auth', (route) => false);
+      }
+    }
   }
 
   Widget _buildSectionTitle(String title) {

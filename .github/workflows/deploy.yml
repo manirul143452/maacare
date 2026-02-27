@@ -1,4 +1,4 @@
-name: Build and Deploy to InsForge
+name: Build and Deploy Flutter Web
 
 on:
   push:
@@ -6,7 +6,7 @@ on:
   workflow_dispatch:
 
 jobs:
-  build-and-deploy:
+  build:
     runs-on: ubuntu-latest
     
     steps:
@@ -18,27 +18,36 @@ jobs:
         with:
           flutter-version: '3.24.0'
           channel: 'stable'
-          cache: true # Enable caching for faster builds
+          cache: true
           
       - name: Get dependencies
         run: flutter pub get
         
       - name: Build Web (Release)
-        run: |
-          flutter build web --release --no-tree-shake-icons --web-renderer canvaskit
-          
-      - name: Deploy to InsForge
-        env:
-          # These must be set in GitHub Settings > Secrets and Variables > Actions
-          INSFORGE_API_KEY: ${{ secrets.INSFORGE_API_KEY }}
-          INSFORGE_PROJECT_ID: "89wh46c8"
-        run: |
-          # Use official InsForge CLI for deployment
-          # The CLI handles zipping and uploading build/web automatically
-          npx @insforge/cli deploy --project $INSFORGE_PROJECT_ID --dir build/web --token $INSFORGE_API_KEY
-          
+        run: flutter build web --release --no-tree-shake-icons --web-renderer canvaskit
+        
       - name: Upload Build Artifacts
         uses: actions/upload-artifact@v4
         with:
           name: maacare-web-build
           path: build/web/
+
+  deploy:
+    needs: build
+    runs-on: ubuntu-latest
+    
+    steps:
+      - name: Download build artifacts
+        uses: actions/download-artifact@v4
+        with:
+          name: maacare-web-build
+          path: ./dist
+          
+      - name: Deploy to InsForge
+        env:
+          INSFORGE_API_KEY: ${{ secrets.INSFORGE_API_KEY }}
+          INSFORGE_PROJECT_ID: "89wh46c8"
+        run: |
+          # The API Key you provided (ik_...) is for InsForge.
+          # We use the @insforge/cli to ensure the deployment works with your key.
+          npx @insforge/cli deploy --project $INSFORGE_PROJECT_ID --dir ./dist --token $INSFORGE_API_KEY

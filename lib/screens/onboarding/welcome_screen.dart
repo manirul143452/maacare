@@ -7,7 +7,10 @@ import 'package:flutter/material.dart';
 import 'package:lottie/lottie.dart';
 import 'package:google_fonts/google_fonts.dart';
 import 'package:flutter_animate/flutter_animate.dart';
+import 'package:provider/provider.dart';
 import '../../app_theme.dart';
+import '../../providers/user_provider.dart';
+import '../../services/insforge_service.dart';
 
 class WelcomeScreen extends StatefulWidget {
   const WelcomeScreen({super.key});
@@ -32,10 +35,23 @@ class _WelcomeScreenState extends State<WelcomeScreen>
       CurvedAnimation(parent: _pulseController, curve: Curves.easeInOut),
     );
     
-    // Navigate to home after 4 seconds
-    Future.delayed(const Duration(seconds: 4), () {
+    // Navigate based on session after 4 seconds
+    Future.delayed(const Duration(seconds: 4), () async {
       if (mounted) {
-        Navigator.pushReplacementNamed(context, '/home');
+        final userProvider = context.read<UserProvider>();
+        await userProvider.loadUser();
+        
+        if (mounted) {
+          if (InsForgeService.instance.isLoggedIn) {
+            if (userProvider.user != null) {
+              Navigator.pushReplacementNamed(context, '/home');
+            } else {
+              Navigator.pushReplacementNamed(context, '/onboarding');
+            }
+          } else {
+            Navigator.pushReplacementNamed(context, '/auth');
+          }
+        }
       }
     });
   }

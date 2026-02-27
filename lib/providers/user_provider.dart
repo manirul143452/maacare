@@ -19,15 +19,18 @@ class UserProvider extends ChangeNotifier {
   bool get isLoggedIn => _user != null;
 
   Future<void> loadUser() async {
-    // In InsForge REST, we might store the user ID in prefs upon login
-    final prefs = await SharedPreferences.getInstance();
-    final userId = prefs.getString('user_id');
-    
-    if (userId == null) return;
-
     _setLoading(true);
     try {
-      _user = await InsForgeService.instance.fetchUser(userId);
+      // 1. Get current user ID from InsForge token/session
+      final currentUser = await InsForgeService.instance.getCurrentUser();
+      
+      if (currentUser != null) {
+        final userId = currentUser['id'];
+        // 2. Fetch profile from database
+        _user = await InsForgeService.instance.fetchUser(userId);
+      } else {
+        _user = null;
+      }
       _error = null;
     } catch (e) {
       _error = 'Could not load profile. Please try again.';
@@ -90,6 +93,12 @@ class UserProvider extends ChangeNotifier {
 
   void _setLoading(bool value) {
     _isLoading = value;
+    notifyListeners();
+  }
+
+  Future<void> signOut() async {
+    await InsForgeService.instance.signOut();
+    _user = null;
     notifyListeners();
   }
 }
