@@ -52,7 +52,8 @@ class _VaccinationTrackerScreenState extends State<VaccinationTrackerScreen> {
         _vaccinations = list;
         _isLoading = false;
       });
-    } catch (_) {
+    } catch (e) {
+      debugPrint('Error loading medical database: $e');
       setState(() => _isLoading = false);
     }
   }
@@ -79,7 +80,7 @@ class _VaccinationTrackerScreenState extends State<VaccinationTrackerScreen> {
       appBar: AppBar(title: const Text('Vaccination Tracker 💉')),
       body: PopScope(
         canPop: true,
-        onPopInvoked: (didPop) {
+        onPopInvokedWithResult: (didPop, result) {
           if (done < total) {
             debugPrint('Mama, don\'t miss any vaccines! Stay safe 🤱');
           }

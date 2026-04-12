@@ -4,6 +4,7 @@
 
 import 'package:flutter_local_notifications/flutter_local_notifications.dart';
 import 'dart:ui' show Color;
+import 'package:flutter/foundation.dart' show kIsWeb;
 
 class NotificationService {
   NotificationService._();
@@ -13,6 +14,7 @@ class NotificationService {
       FlutterLocalNotificationsPlugin();
 
   Future<void> initialize() async {
+    if (kIsWeb) return;
     const androidSettings =
         AndroidInitializationSettings('@mipmap/ic_launcher');
     const darwinSettings = DarwinInitializationSettings(

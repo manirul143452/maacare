@@ -12,7 +12,6 @@ import 'package:google_fonts/google_fonts.dart';
 import '../../app_theme.dart';
 import '../../providers/user_provider.dart';
 import '../../providers/community_provider.dart';
-import '../../widgets/maa_button.dart';
 
 class ProfileScreen extends StatefulWidget {
   const ProfileScreen({super.key});
@@ -73,7 +72,8 @@ class _ProfileScreenState extends State<ProfileScreen>
           content: const Text('Name updated! Looking good, Mama! 🌸'),
           behavior: SnackBarBehavior.floating,
           backgroundColor: MaaColors.cardLight,
-          shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(12)),
+          shape:
+              RoundedRectangleBorder(borderRadius: BorderRadius.circular(12)),
         ),
       );
     }
@@ -81,7 +81,8 @@ class _ProfileScreenState extends State<ProfileScreen>
 
   Future<void> _pickAvatar() async {
     final picker = ImagePicker();
-    final file = await picker.pickImage(source: ImageSource.gallery, maxWidth: 512);
+    final file =
+        await picker.pickImage(source: ImageSource.gallery, maxWidth: 512);
     if (file == null) return;
 
     setState(() => _isUploadingAvatar = true);
@@ -90,11 +91,12 @@ class _ProfileScreenState extends State<ProfileScreen>
       final ext = file.path.split('.').last;
       final fileName = 'avatar_${DateTime.now().millisecondsSinceEpoch}.$ext';
 
+      if (!mounted) return;
       final url = await context.read<CommunityProvider>().uploadMedia(
-        fileName,
-        bytes,
-        bucket: 'community_media',
-      );
+            fileName,
+            bytes,
+            bucket: 'community_media',
+          );
 
       if (url != null && mounted) {
         final provider = context.read<UserProvider>();
@@ -103,21 +105,24 @@ class _ProfileScreenState extends State<ProfileScreen>
           final updatedUser = user.copyWith(avatarUrl: url);
           await provider.createOrUpdateUser(updatedUser);
           _confettiController.play();
-          ScaffoldMessenger.of(context).showSnackBar(
-            SnackBar(
-              content: const Text('Avatar updated! Beautiful! 💕'),
-              behavior: SnackBarBehavior.floating,
-              backgroundColor: MaaColors.cardLight,
-              shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(12)),
-            ),
-          );
+          if (mounted) {
+            ScaffoldMessenger.of(context).showSnackBar(
+              SnackBar(
+                content: const Text('Avatar updated! Beautiful! 💕'),
+                behavior: SnackBarBehavior.floating,
+                backgroundColor: MaaColors.cardLight,
+                shape: RoundedRectangleBorder(
+                    borderRadius: BorderRadius.circular(12)),
+              ),
+            );
+          }
         }
       }
     } catch (_) {
       if (mounted) {
         ScaffoldMessenger.of(context).showSnackBar(
-          SnackBar(
-            content: const Text('Upload failed. Try again! 😅'),
+          const SnackBar(
+            content: Text('Upload failed. Try again! 😅'),
             backgroundColor: MaaColors.cardLight,
           ),
         );
@@ -152,14 +157,17 @@ class _ProfileScreenState extends State<ProfileScreen>
     if (picked != null && mounted) {
       final updatedUser = user.copyWith(dueDate: picked);
       await provider.createOrUpdateUser(updatedUser);
-      ScaffoldMessenger.of(context).showSnackBar(
-        SnackBar(
-          content: const Text('Due date updated! 📅💕'),
-          behavior: SnackBarBehavior.floating,
-          backgroundColor: MaaColors.cardLight,
-          shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(12)),
-        ),
-      );
+      if (mounted) {
+        ScaffoldMessenger.of(context).showSnackBar(
+          SnackBar(
+            content: const Text('Due date updated! 📅💕'),
+            behavior: SnackBarBehavior.floating,
+            backgroundColor: MaaColors.cardLight,
+            shape:
+                RoundedRectangleBorder(borderRadius: BorderRadius.circular(12)),
+          ),
+        );
+      }
     }
   }
 
@@ -195,7 +203,7 @@ class _ProfileScreenState extends State<ProfileScreen>
                   curve: Curves.easeInOut,
                 );
           }),
-          
+
           Consumer<UserProvider>(
             builder: (ctx, provider, _) {
               final user = provider.user;
@@ -217,7 +225,7 @@ class _ProfileScreenState extends State<ProfileScreen>
               );
             },
           ),
-          
+
           // Confetti
           Align(
             alignment: Alignment.topCenter,
@@ -287,7 +295,7 @@ class _ProfileScreenState extends State<ProfileScreen>
             ],
           ),
           const SizedBox(height: 30),
-          
+
           // Avatar with glow
           Stack(
             children: [
@@ -311,7 +319,7 @@ class _ProfileScreenState extends State<ProfileScreen>
                   );
                 },
               ),
-              
+
               // Avatar container
               Positioned(
                 left: 10,
@@ -322,10 +330,11 @@ class _ProfileScreenState extends State<ProfileScreen>
                   decoration: BoxDecoration(
                     shape: BoxShape.circle,
                     gradient: MaaColors.primaryGradient,
-                    border: Border.all(color: MaaColors.white.withAlpha(50), width: 3),
+                    border: Border.all(
+                        color: MaaColors.white.withAlpha(50), width: 3),
                   ),
                   child: _isUploadingAvatar
-                      ? Center(
+                      ? const Center(
                           child: CircularProgressIndicator(
                             color: MaaColors.white,
                             strokeWidth: 2,
@@ -338,13 +347,14 @@ class _ProfileScreenState extends State<ProfileScreen>
                                 fit: BoxFit.cover,
                                 width: 120,
                                 height: 120,
-                                errorBuilder: (_, __, ___) => _buildInitial(user),
+                                errorBuilder: (_, __, ___) =>
+                                    _buildInitial(user),
                               ),
                             )
                           : _buildInitial(user),
                 ),
               ).animate().scale(curve: Curves.elasticOut, duration: 800.ms),
-              
+
               // Camera button
               Positioned(
                 right: 5,
@@ -375,7 +385,7 @@ class _ProfileScreenState extends State<ProfileScreen>
             ],
           ),
           const SizedBox(height: 20),
-          
+
           // Name
           _isEditingName
               ? Container(
@@ -392,16 +402,19 @@ class _ProfileScreenState extends State<ProfileScreen>
                     ),
                     decoration: InputDecoration(
                       hintText: 'Your name',
-                      hintStyle: GoogleFonts.poppins(color: MaaColors.textMuted),
+                      hintStyle:
+                          GoogleFonts.poppins(color: MaaColors.textMuted),
                       filled: true,
                       fillColor: MaaColors.cardDark,
                       border: OutlineInputBorder(
                         borderRadius: BorderRadius.circular(12),
                         borderSide: BorderSide.none,
                       ),
-                      contentPadding: const EdgeInsets.symmetric(horizontal: 12, vertical: 10),
+                      contentPadding: const EdgeInsets.symmetric(
+                          horizontal: 12, vertical: 10),
                       suffixIcon: IconButton(
-                        icon: const Icon(Icons.check_circle_rounded, color: MaaColors.pink),
+                        icon: const Icon(Icons.check_circle_rounded,
+                            color: MaaColors.pink),
                         onPressed: _saveName,
                       ),
                     ),
@@ -431,7 +444,7 @@ class _ProfileScreenState extends State<ProfileScreen>
                   ),
                 ),
           const SizedBox(height: 8),
-          
+
           // Badge title
           Container(
             padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 8),
@@ -609,7 +622,8 @@ class _ProfileScreenState extends State<ProfileScreen>
     ).animate().fadeIn(delay: 300.ms).moveY(begin: 20, end: 0);
   }
 
-  Widget _buildTappableInfoRow(String emoji, String label, String value, VoidCallback onTap) {
+  Widget _buildTappableInfoRow(
+      String emoji, String label, String value, VoidCallback onTap) {
     return GestureDetector(
       onTap: onTap,
       child: Padding(
@@ -704,12 +718,12 @@ class _ProfileScreenState extends State<ProfileScreen>
 
   Widget _buildBadgesSection(user) {
     final badges = [
-      _Badge('🌸', 'Day 1 Mama', true, MaaColors.pink),
-      _Badge('⭐', 'Mood Logger', true, MaaColors.gold),
-      _Badge('🍼', 'Water Pro', false, MaaColors.lightBlue),
-      _Badge('🧘', 'Zen Master', false, MaaColors.softPurple),
-      _Badge('💪', 'Streak Hero', false, MaaColors.success),
-      _Badge('👑', 'Super Mom', false, MaaColors.gold),
+      const _Badge('🌸', 'Day 1 Mama', true, MaaColors.pink),
+      const _Badge('⭐', 'Mood Logger', true, MaaColors.gold),
+      const _Badge('🍼', 'Water Pro', false, MaaColors.lightBlue),
+      const _Badge('🧘', 'Zen Master', false, MaaColors.softPurple),
+      const _Badge('💪', 'Streak Hero', false, MaaColors.success),
+      const _Badge('👑', 'Super Mom', false, MaaColors.gold),
     ];
 
     return Container(
@@ -805,9 +819,7 @@ class _ProfileScreenState extends State<ProfileScreen>
                   badge.emoji,
                   style: TextStyle(
                     fontSize: 24,
-                    color: badge.unlocked
-                        ? null
-                        : MaaColors.textMuted,
+                    color: badge.unlocked ? null : MaaColors.textMuted,
                   ),
                 ),
               ),
@@ -824,7 +836,7 @@ class _ProfileScreenState extends State<ProfileScreen>
               ),
             ),
             if (!badge.unlocked)
-              Icon(
+              const Icon(
                 Icons.lock_rounded,
                 size: 12,
                 color: MaaColors.textMuted,
@@ -853,7 +865,8 @@ class _ProfileScreenState extends State<ProfileScreen>
                     content: const Text('Data synced! ✨'),
                     behavior: SnackBarBehavior.floating,
                     backgroundColor: MaaColors.cardLight,
-                    shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(12)),
+                    shape: RoundedRectangleBorder(
+                        borderRadius: BorderRadius.circular(12)),
                   ),
                 );
               }
@@ -879,7 +892,8 @@ class _ProfileScreenState extends State<ProfileScreen>
     );
   }
 
-  Widget _buildActionButton(String label, VoidCallback onPressed, Color color, {bool outlined = false}) {
+  Widget _buildActionButton(String label, VoidCallback onPressed, Color color,
+      {bool outlined = false}) {
     return SizedBox(
       width: double.infinity,
       child: GestureDetector(
@@ -887,10 +901,14 @@ class _ProfileScreenState extends State<ProfileScreen>
         child: Container(
           padding: const EdgeInsets.symmetric(vertical: 16),
           decoration: BoxDecoration(
-            gradient: outlined ? null : LinearGradient(colors: [color, color.withAlpha(200)]),
+            gradient: outlined
+                ? null
+                : LinearGradient(colors: [color, color.withAlpha(200)]),
             color: outlined ? Colors.transparent : null,
             borderRadius: BorderRadius.circular(16),
-            border: outlined ? Border.all(color: color.withAlpha(80), width: 1.5) : null,
+            border: outlined
+                ? Border.all(color: color.withAlpha(80), width: 1.5)
+                : null,
             boxShadow: outlined
                 ? null
                 : [

@@ -6,10 +6,12 @@
     <!-- Razorpay needs this for phone-based payments -->
     <uses-permission android:name="android.permission.READ_PHONE_STATE"/>
     
-    <!-- Image Picker Permissions -->
     <uses-permission android:name="android.permission.CAMERA" />
     <uses-permission android:name="android.permission.READ_EXTERNAL_STORAGE" />
     <uses-permission android:name="android.permission.WRITE_EXTERNAL_STORAGE" />
+    <!-- 100ms WebRTC Permissions -->
+    <uses-permission android:name="android.permission.RECORD_AUDIO" />
+    <uses-permission android:name="android.permission.BLUETOOTH_CONNECT" />
 
     <application
         android:label="MaaCare"

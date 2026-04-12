@@ -15,7 +15,7 @@ class MaaColors {
   static const Color surfaceDark = Color(0xFF1A1A2E);
   static const Color cardDark = Color(0xFF1E1E2E);
   static const Color cardLight = Color(0xFF252538);
-  
+
   // ── Accent Colors ──
   static const Color pink = Color(0xFFFF69B4);
   static const Color pinkGlow = Color(0xFFFF69B4);
@@ -23,7 +23,7 @@ class MaaColors {
   static const Color deepPink = Color(0xFFD81B60);
   static const Color gold = Color(0xFFFFD700);
   static const Color goldDark = Color(0xFFFFB347);
-  
+
   // ── Supporting Colors ──
   static const Color peach = Color(0xFFFFDAB9);
   static const Color lightBlue = Color(0xFFA7D8DE);
@@ -31,21 +31,21 @@ class MaaColors {
   static const Color softGreen = Color(0xFF4CAF50);
   static const Color white = Color(0xFFFFFFFF);
   static const Color offWhite = Color(0xFFFFF9FB);
-  
+
   // ── Text Colors ──
   static const Color textPrimary = Color(0xFFFFFFFF);
   static const Color textSecondary = Color(0xFFB0B0C0);
   static const Color textMuted = Color(0xFF6B6B80);
   static const Color textDark = Color(0xFF3D1A2E);
   static const Color textGrey = Color(0xFF9E9E9E);
-  
+
   // ── Status Colors ──
   static const Color success = Color(0xFF4CAF50);
   static const Color successGlow = Color(0xFF81C784);
   static const Color warning = Color(0xFFFFA726);
   static const Color error = Color(0xFFEF5350);
   static const Color errorGlow = Color(0xFFFF5252);
-  
+
   // ── Gradients ──
   static const LinearGradient primaryGradient = LinearGradient(
     colors: [pink, softPurple],
@@ -87,7 +87,7 @@ class MaaColors {
   static Color glassBackground = white.withAlpha(15);
   static Color glassBorder = white.withAlpha(30);
   static Color glassHighlight = white.withAlpha(10);
-  
+
   // ── Shadows & Glows ──
   static Color pinkShadow = pink.withAlpha(80);
   static Color goldShadow = gold.withAlpha(60);
@@ -187,7 +187,8 @@ class MaaTheme {
       inputDecorationTheme: InputDecorationTheme(
         filled: true,
         fillColor: MaaColors.cardDark,
-        contentPadding: const EdgeInsets.symmetric(horizontal: 20, vertical: 16),
+        contentPadding:
+            const EdgeInsets.symmetric(horizontal: 20, vertical: 16),
         border: OutlineInputBorder(
           borderRadius: BorderRadius.circular(16),
           borderSide: BorderSide(color: MaaColors.glassBorder),
@@ -357,7 +358,7 @@ class _NeonButtonState extends State<NeonButton>
   @override
   Widget build(BuildContext context) {
     final buttonColor = widget.color ?? MaaColors.pink;
-    
+
     return GestureDetector(
       onTapDown: (_) => setState(() => _isPressed = true),
       onTapUp: (_) => setState(() => _isPressed = false),
@@ -372,9 +373,11 @@ class _NeonButtonState extends State<NeonButton>
             return Container(
               padding: const EdgeInsets.symmetric(horizontal: 24, vertical: 14),
               decoration: BoxDecoration(
-                gradient: widget.outlined ? null : LinearGradient(
-                  colors: [buttonColor, buttonColor.withAlpha(200)],
-                ),
+                gradient: widget.outlined
+                    ? null
+                    : LinearGradient(
+                        colors: [buttonColor, buttonColor.withAlpha(200)],
+                      ),
                 color: widget.outlined ? Colors.transparent : null,
                 borderRadius: BorderRadius.circular(30),
                 border: widget.outlined
@@ -583,7 +586,7 @@ class _MoodSelectorState extends State<MoodSelector>
           children: List.generate(_moods.length, (index) {
             final mood = _moods[index];
             final isSelected = widget.selectedMood == mood.emoji;
-            
+
             return MouseRegion(
               onEnter: (_) => setState(() => _hoveredIndex = index),
               onExit: (_) => setState(() => _hoveredIndex = null),
@@ -604,9 +607,7 @@ class _MoodSelectorState extends State<MoodSelector>
                             ? mood.color.withAlpha(40)
                             : MaaColors.cardLight,
                         border: Border.all(
-                          color: isSelected
-                              ? mood.color
-                              : Colors.transparent,
+                          color: isSelected ? mood.color : Colors.transparent,
                           width: 2,
                         ),
                         boxShadow: isSelected
@@ -711,7 +712,7 @@ class ParticleBackground extends StatelessWidget {
           final random = index * 37 % 100;
           final size = 2.0 + (index % 4);
           final opacity = 0.1 + (index % 5) * 0.05;
-          
+
           return Positioned(
             left: (random * 3.6) % MediaQuery.of(context).size.width,
             top: (random * 5.2) % MediaQuery.of(context).size.height,
@@ -724,7 +725,8 @@ class ParticleBackground extends StatelessWidget {
                     ? MaaColors.pink.withAlpha((opacity * 255).round())
                     : index % 3 == 1
                         ? MaaColors.gold.withAlpha((opacity * 255).round())
-                        : MaaColors.softPurple.withAlpha((opacity * 255).round()),
+                        : MaaColors.softPurple
+                            .withAlpha((opacity * 255).round()),
               ),
             ).animate(onPlay: (c) => c.repeat()).moveY(
                   begin: 0,
@@ -830,9 +832,9 @@ class CuriosityTeaser extends StatelessWidget {
         child: Row(
           mainAxisSize: MainAxisSize.min,
           children: [
-            Text(
+            const Text(
               '🔮',
-              style: const TextStyle(fontSize: 18),
+              style: TextStyle(fontSize: 18),
             ).animate(onPlay: (c) => c.repeat()).shimmer(
                   duration: 2000.ms,
                   color: MaaColors.pink.withAlpha(100),
@@ -863,5 +865,6 @@ class CuriosityTeaser extends StatelessWidget {
 
 // ── Extension for Animate ──
 extension AnimateExtension on Widget {
-  Widget get animateFade => animate().fadeIn(duration: 300.ms).moveY(begin: 20, end: 0);
+  Widget get animateFade =>
+      animate().fadeIn(duration: 300.ms).moveY(begin: 20, end: 0);
 }

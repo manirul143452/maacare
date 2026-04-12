@@ -4,15 +4,19 @@
 
 import 'package:flutter/foundation.dart';
 import '../models/post_model.dart';
+import '../models/user_model.dart';
 import '../services/insforge_service.dart';
+import '../services/realtime_client.dart';
 
 class CommunityProvider extends ChangeNotifier {
   List<PostModel> _posts = [];
+  List<UserModel> _suggestedMamas = [];
   bool _isLoading = false;
   String? _error;
   int? _weekFilter;
 
   List<PostModel> get posts => _posts;
+  List<UserModel> get suggestedMamas => _suggestedMamas;
   bool get isLoading => _isLoading;
   String? get error => _error;
   int? get weekFilter => _weekFilter;
@@ -22,7 +26,25 @@ class CommunityProvider extends ChangeNotifier {
     _setLoading(true);
     try {
       _posts = await InsForgeService.instance.fetchPosts(weekTag: weekTag);
+      _suggestedMamas = await InsForgeService.instance.fetchUsers(limit: 8);
+      _suggestedMamas.shuffle();
+      if (_suggestedMamas.length > 5) {
+         _suggestedMamas = _suggestedMamas.sublist(0, 5);
+      }
       _error = null;
+
+      InsForgeRealtimeClient.instance.subscribe('posts:all', (payload) {
+        if (payload['event'] == 'INSERT_post') {
+          final newPost = PostModel.fromMap(payload['record']);
+          if (!_posts.any((p) => p.id == newPost.id)) {
+             if (_weekFilter == null || _weekFilter == newPost.weekTag) {
+                 _posts.insert(0, newPost);
+                 notifyListeners();
+             }
+          }
+        }
+      });
+      
     } catch (e) {
       _error = 'Could not load posts. Check your connection.';
     } finally {

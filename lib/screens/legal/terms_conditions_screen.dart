@@ -22,13 +22,13 @@ class TermsConditionsScreen extends StatelessWidget {
       appBar: AppBar(title: const Text('Terms & Conditions')),
       body: Column(
         children: [
-          Expanded(
+          const Expanded(
             child: SingleChildScrollView(
-              padding: const EdgeInsets.all(20),
+              padding: EdgeInsets.all(20),
               child: Column(
                 crossAxisAlignment: CrossAxisAlignment.start,
                 children: [
-                  const Text(
+                  Text(
                     'Safe & Supportive Space 🌸',
                     style: TextStyle(
                       fontSize: 22,
@@ -36,8 +36,8 @@ class TermsConditionsScreen extends StatelessWidget {
                       color: MaaColors.textDark,
                     ),
                   ),
-                  const SizedBox(height: 16),
-                  const Text(
+                  SizedBox(height: 16),
+                  Text(
                     'By joining MaaCare, you agree to follow our community guidelines:\n\n'
                     '1. Supportiveness: This is a safe space for all mothers. Harassment or negativity will not be tolerated.\n'
                     '2. Medical Advice: MaaCare provides informational support. Always consult your doctor for medical decisions.\n'
@@ -45,8 +45,8 @@ class TermsConditionsScreen extends StatelessWidget {
                     '4. Subscription: Premium features are subject to our payment terms.',
                     style: TextStyle(fontSize: 15, height: 1.5),
                   ),
-                  const SizedBox(height: 32),
-                  const Text(
+                  SizedBox(height: 32),
+                  Text(
                     'Your journey is unique, and we are here to support it.',
                     style: TextStyle(
                       fontSize: 14,

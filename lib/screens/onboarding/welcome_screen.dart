@@ -35,23 +35,29 @@ class _WelcomeScreenState extends State<WelcomeScreen>
       CurvedAnimation(parent: _pulseController, curve: Curves.easeInOut),
     );
     
-    // Navigate based on session after 4 seconds
+    // Navigate based on VALID session after 4 seconds
     Future.delayed(const Duration(seconds: 4), () async {
-      if (mounted) {
-        final userProvider = context.read<UserProvider>();
-        await userProvider.loadUser();
-        
-        if (mounted) {
-          if (InsForgeService.instance.isLoggedIn) {
-            if (userProvider.user != null) {
-              Navigator.pushReplacementNamed(context, '/home');
-            } else {
-              Navigator.pushReplacementNamed(context, '/onboarding');
-            }
-          } else {
-            Navigator.pushReplacementNamed(context, '/auth');
-          }
-        }
+      if (!mounted) return;
+
+      // isLoggedIn now checks token expiry, so this is bulletproof
+      if (!InsForgeService.instance.isLoggedIn) {
+        // No valid session → go to Login/Signup
+        Navigator.pushReplacementNamed(context, '/auth');
+        return;
+      }
+
+      // Valid token exists → check if profile is complete
+      final userProvider = context.read<UserProvider>();
+      await userProvider.loadUser();
+
+      if (!mounted) return;
+
+      if (userProvider.user != null) {
+        // Profile complete → go to home
+        Navigator.pushReplacementNamed(context, '/home');
+      } else {
+        // Logged in but no profile → go to onboarding
+        Navigator.pushReplacementNamed(context, '/onboarding');
       }
     });
   }

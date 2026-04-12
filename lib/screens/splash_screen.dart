@@ -9,6 +9,8 @@ import 'package:shared_preferences/shared_preferences.dart';
 import 'package:flutter_animate/flutter_animate.dart';
 import '../../app_theme.dart';
 import '../../providers/user_provider.dart';
+import '../../services/insforge_service.dart';
+import '../../services/notification_service.dart';
 import 'legal/privacy_policy_screen.dart';
 import 'legal/terms_conditions_screen.dart';
 
@@ -48,6 +50,14 @@ class _SplashScreenState extends State<SplashScreen>
   }
 
   Future<void> _loadState() async {
+    try {
+      await InsForgeService.instance.loadSession();
+    } catch (_) {}
+    
+    try {
+      await NotificationService.instance.initialize();
+    } catch (_) {}
+
     final prefs = await SharedPreferences.getInstance();
     final onboardingDone = prefs.getBool('onboarding_complete') ?? false;
     final name = prefs.getString('user_name') ?? '';
@@ -107,16 +117,14 @@ class _SplashScreenState extends State<SplashScreen>
                   ),
                   transitionsBuilder:
                       (context, animation, secondaryAnimation, child) {
-                    return FadeTransition(
-                        opacity: animation, child: child);
+                    return FadeTransition(opacity: animation, child: child);
                   },
                   transitionDuration: const Duration(milliseconds: 500),
                 ),
               );
             },
           ),
-          transitionsBuilder:
-              (context, animation, secondaryAnimation, child) {
+          transitionsBuilder: (context, animation, secondaryAnimation, child) {
             return FadeTransition(opacity: animation, child: child);
           },
           transitionDuration: const Duration(milliseconds: 500),
@@ -145,7 +153,7 @@ class _SplashScreenState extends State<SplashScreen>
               gradient: MaaColors.darkGradient,
             ),
           ),
-          
+
           // Animated particles
           ...List.generate(25, (index) {
             final random = index * 37 % 100;
@@ -218,7 +226,7 @@ class _SplashScreenState extends State<SplashScreen>
                             width: 110,
                             height: 110,
                             decoration: BoxDecoration(
-                              color: MaaColors.cardDark,
+                              color: Colors.white,
                               shape: BoxShape.circle,
                               border: Border.all(
                                 color: MaaColors.pink.withAlpha(150),
@@ -232,10 +240,12 @@ class _SplashScreenState extends State<SplashScreen>
                                 ),
                               ],
                             ),
-                            child: const Center(
-                              child: Text(
-                                '🤱',
-                                style: TextStyle(fontSize: 56),
+                            child: Center(
+                              child: Image.asset(
+                                'assets/images/logo.png',
+                                width: 70,
+                                height: 70,
+                                fit: BoxFit.contain,
                               ),
                             ),
                           ),
@@ -288,18 +298,14 @@ class _SplashScreenState extends State<SplashScreen>
                     child: Text(
                       _greeting,
                       textAlign: TextAlign.center,
-                      style: TextStyle(
+                      style: const TextStyle(
                         color: MaaColors.textSecondary,
                         fontSize: 15,
                         fontWeight: FontWeight.w500,
                       ),
                     ),
-                  )
-                      .animate()
-                      .fadeIn(duration: 600.ms)
-                      .scale(
-                          begin: const Offset(0.8, 0.8),
-                          curve: Curves.easeOutBack),
+                  ).animate().fadeIn(duration: 600.ms).scale(
+                      begin: const Offset(0.8, 0.8), curve: Curves.easeOutBack),
 
                 const SizedBox(height: 24),
 
@@ -331,7 +337,7 @@ class _SplashScreenState extends State<SplashScreen>
                         const SizedBox(width: 12),
                         Text(
                           _curiosityTeaser,
-                          style: TextStyle(
+                          style: const TextStyle(
                             color: MaaColors.textPrimary,
                             fontSize: 13,
                             fontWeight: FontWeight.w500,
@@ -339,10 +345,7 @@ class _SplashScreenState extends State<SplashScreen>
                         ),
                       ],
                     ),
-                  )
-                      .animate()
-                      .fadeIn(duration: 600.ms)
-                      .moveX(begin: 20, end: 0),
+                  ).animate().fadeIn(duration: 600.ms).moveX(begin: 20, end: 0),
 
                 const SizedBox(height: 80),
 
@@ -354,7 +357,7 @@ class _SplashScreenState extends State<SplashScreen>
                     color: MaaColors.glassBackground,
                     borderRadius: BorderRadius.circular(20),
                   ),
-                  child: Row(
+                  child: const Row(
                     mainAxisSize: MainAxisSize.min,
                     children: [
                       SizedBox(
@@ -366,7 +369,7 @@ class _SplashScreenState extends State<SplashScreen>
                               AlwaysStoppedAnimation<Color>(MaaColors.pink),
                         ),
                       ),
-                      const SizedBox(width: 12),
+                      SizedBox(width: 12),
                       Text(
                         'Preparing your experience...',
                         style: TextStyle(
@@ -377,9 +380,7 @@ class _SplashScreenState extends State<SplashScreen>
                       ),
                     ],
                   ),
-                )
-                    .animate(onPlay: (c) => c.repeat())
-                    .fadeIn(duration: 800.ms),
+                ).animate(onPlay: (c) => c.repeat()).fadeIn(duration: 800.ms),
               ],
             ),
           ),
@@ -415,16 +416,14 @@ class _SplashScreenState extends State<SplashScreen>
                           ),
                         ],
                       ),
-                    )
-                        .animate(onPlay: (c) => c.repeat())
-                        .scale(
+                    ).animate(onPlay: (c) => c.repeat()).scale(
                           begin: const Offset(1, 1),
                           end: const Offset(1.3, 1.3),
                           duration: 1000.ms,
                           curve: Curves.easeInOut,
                         ),
                     const SizedBox(width: 10),
-                    Text(
+                    const Text(
                       '1,23,456 Mamas online',
                       style: TextStyle(
                         color: MaaColors.textSecondary,

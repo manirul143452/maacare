@@ -21,16 +21,25 @@ dependencies:
   http_parser: 4.0.2
 
   # Internationalization
-  intl: ^0.19.0
+  intl: ^0.20.2
 
   # Local Storage
   shared_preferences: ^2.3.2
 
+  # OAuth PKCE Flow requirements
+  url_launcher: ^6.3.0
+  crypto: ^3.0.3
+
+  # WebSockets for Realtime
+  web_socket_channel: ^3.0.1
+
   # Notifications
   flutter_local_notifications: ^17.2.2
 
-  # Video Player
+  # Video Player & WebRTC (100ms)
   video_player: ^2.8.7
+  hms_room_kit: ^1.2.0
+  permission_handler: ^12.0.1
 
   # Fonts
   google_fonts: ^6.2.1
@@ -41,7 +50,7 @@ dependencies:
   confetti: ^0.7.0
 
   # Sharing
-  share_plus: ^10.1.2
+  share_plus: ^12.0.1
   fl_chart: ^0.68.0
   smooth_page_indicator: ^1.1.0
   cached_network_image: ^3.3.1
@@ -74,8 +83,10 @@ flutter_launcher_icons:
 flutter:
   uses-material-design: true
 
-  # assets:
-  #   - assets/images/
+  assets:
+    - assets/images/
+    - assets/images/weeks/
+    - assets/data/medical_database/
   #   - assets/animations/
 
   # fonts:
@@ -88,3 +99,8 @@ flutter:
   #         weight: 600
   #       - asset: assets/fonts/Poppins-Bold.ttf
   #         weight: 700
+
+  # Trigger auto pub get
+
+dependency_overrides:
+  lottie: ^3.1.2

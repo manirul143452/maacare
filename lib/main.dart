@@ -5,14 +5,12 @@
 
 import 'package:flutter/material.dart';
 import 'package:provider/provider.dart';
-import 'services/insforge_service.dart';
 import 'screens/onboarding/welcome_screen.dart';
 import 'app_theme.dart';
 import 'constants.dart';
 import 'providers/user_provider.dart';
 import 'providers/chat_provider.dart';
 import 'providers/community_provider.dart';
-import 'services/notification_service.dart';
 import 'screens/onboarding/auth_screen.dart';
 
 // Screens
@@ -27,22 +25,19 @@ import 'screens/pregnancy_tracker/pregnancy_tracker_screen.dart';
 import 'screens/community/parents_park_screen.dart';
 import 'screens/symptom_checker/symptom_checker_screen.dart';
 import 'screens/consult_expert/consult_expert_screen.dart';
+import 'screens/consult_expert/doctor_registration_screen.dart';
+import 'screens/consult_expert/doctor_dashboard_screen.dart';
+import 'screens/subscription/subscription_screen.dart';
 import 'screens/self_care/self_care_screen.dart';
+import 'screens/profile/profile_screen.dart';
 import 'screens/vaccinations/vaccination_tracker_screen.dart';
 import 'screens/nutrition/nutrition_guide_screen.dart';
-import 'screens/profile/profile_screen.dart';
+import 'screens/nutrition/universal_nutrition_form_screen.dart';
 import 'screens/settings/settings_screen.dart';
-import 'screens/subscription/subscription_screen.dart';
 import 'screens/help_center/help_center_screen.dart';
 
 Future<void> main() async {
   WidgetsFlutterBinding.ensureInitialized();
-
-  // Load InsForge session
-  await InsForgeService.instance.loadSession();
-
-  // Initialize notifications
-  await NotificationService.instance.initialize();
 
   runApp(const MaaCareApp());
 }
@@ -64,8 +59,8 @@ class MaaCareApp extends StatelessWidget {
         theme: MaaTheme.darkTheme,
         darkTheme: MaaTheme.darkTheme,
         themeMode: ThemeMode.dark,
-        initialRoute: '/welcome',
-        onGenerateRoute: _generateRoute,
+        initialRoute: '/splash',
+        home: const SplashScreen(),
         routes: {
           '/welcome': (_) => const WelcomeScreen(),
           '/auth': (_) => const AuthScreen(),
@@ -84,10 +79,14 @@ class MaaCareApp extends StatelessWidget {
           '/community': (_) => const ParentsParkScreen(),
           '/symptoms': (_) => const SymptomCheckerScreen(),
           '/consult': (_) => const ConsultExpertScreen(),
+          '/doctor-registration': (_) => const DoctorRegistrationScreen(),
+          '/doctor-dashboard': (_) => const DoctorDashboardScreen(),
           '/selfcare': (_) => const SelfCareScreen(),
           '/vaccinations': (_) => const VaccinationTrackerScreen(),
           '/nutrition': (_) => const NutritionGuideScreen(),
+          '/nutrition_form': (_) => const UniversalNutritionFormScreen(),
         },
+        onGenerateRoute: _generateRoute,
       ),
     );
   }
@@ -117,8 +116,28 @@ class MaaCareApp extends StatelessWidget {
             return const ProfileScreen();
           case '/community':
             return const ParentsParkScreen();
+          case '/doctor-registration':
+            return const DoctorRegistrationScreen();
+          case '/doctor-dashboard':
+            return const DoctorDashboardScreen();
+          case '/consult':
+            return const ConsultExpertScreen();
+          case '/subscription':
+            return const SubscriptionScreen();
+          case '/symptoms':
+            return const SymptomCheckerScreen();
+          case '/family-planning':
+            return const FamilyPlanningScreen();
+          case '/self-care':
+            return const SelfCareScreen();
+          case '/nutrition_form':
+            return const UniversalNutritionFormScreen();
+          case '/privacy':
+            return const PrivacyPolicyScreen();
+          case '/terms':
+            return const TermsConditionsScreen();
           default:
-            return const SplashScreen();
+            return const AuthScreen();
         }
       },
       transitionsBuilder: (context, animation, secondaryAnimation, child) {

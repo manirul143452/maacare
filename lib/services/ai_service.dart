@@ -22,12 +22,6 @@ class AIService {
       if (response != null) return response;
     } catch (_) {}
 
-    // ─── Try xAI Grok (fallback) ───
-    try {
-      final response = await _callGrokAI(messages);
-      if (response != null) return response;
-    } catch (_) {}
-
     // ─── Both failed ───
     return "I'm here for you, Mama 💕 My connection is a bit weak right now. Let's try again in a moment! 🌸";
   }
@@ -55,39 +49,6 @@ class AIService {
       final data = jsonDecode(response.body);
       if (data['success'] == true && data['content'] != null) {
         return data['content'] as String;
-      }
-    }
-    return null;
-  }
-
-  // ─────────────────── xAI Grok (Fallback) ───────────────────
-
-  Future<String?> _callGrokAI(List<Map<String, String>> messages) async {
-    // Prepend system prompt for Grok
-    final grokMessages = <Map<String, String>>[
-      {'role': 'system', 'content': AppConstants.aiSystemPrompt},
-      ...messages,
-    ];
-
-    final response = await http.post(
-      Uri.parse(AppConstants.xaiBaseUrl),
-      headers: {
-        'Content-Type': 'application/json',
-        'Authorization': 'Bearer ${AppConstants.xaiApiKey}',
-      },
-      body: jsonEncode({
-        'model': AppConstants.xaiModel,
-        'messages': grokMessages,
-        'stream': false,
-        'temperature': 0.7,
-      }),
-    ).timeout(const Duration(seconds: 20));
-
-    if (response.statusCode == 200) {
-      final data = jsonDecode(response.body);
-      final choices = data['choices'] as List?;
-      if (choices != null && choices.isNotEmpty) {
-        return choices[0]['message']['content'] as String;
       }
     }
     return null;

@@ -22,10 +22,9 @@ class UserProvider extends ChangeNotifier {
     _setLoading(true);
     try {
       // 1. Get current user ID from InsForge token/session
-      final currentUser = await InsForgeService.instance.getCurrentUser();
+      final userId = InsForgeService.instance.getCurrentUserId();
       
-      if (currentUser != null) {
-        final userId = currentUser['id'];
+      if (userId != null) {
         // 2. Fetch profile from database
         _user = await InsForgeService.instance.fetchUser(userId);
       } else {
@@ -53,6 +52,7 @@ class UserProvider extends ChangeNotifier {
       await prefs.setString('user_name', user.name);
     } catch (e) {
       _error = 'Could not save profile. Please try again.';
+      rethrow;
     } finally {
       _setLoading(false);
     }
@@ -78,6 +78,21 @@ class UserProvider extends ChangeNotifier {
 
     try {
       await InsForgeService.instance.updatePoints(_user!.id, newPoints);
+    } catch (_) {}
+  }
+
+  Future<void> markPremium({required String planName, required String paymentId}) async {
+    if (_user == null) return;
+    _user = _user!.copyWith(isPremium: true, premiumPlan: planName);
+    notifyListeners();
+
+    try {
+      await InsForgeService.instance.updatePremiumStatus(
+        userId: _user!.id,
+        isPremium: true,
+        planName: planName,
+        paymentId: paymentId,
+      );
     } catch (_) {}
   }
 

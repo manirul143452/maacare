@@ -22,13 +22,13 @@ class PrivacyPolicyScreen extends StatelessWidget {
       appBar: AppBar(title: const Text('Privacy Policy')),
       body: Column(
         children: [
-          Expanded(
+          const Expanded(
             child: SingleChildScrollView(
-              padding: const EdgeInsets.all(20),
+              padding: EdgeInsets.all(20),
               child: Column(
                 crossAxisAlignment: CrossAxisAlignment.start,
                 children: [
-                  const Text(
+                  Text(
                     'Your privacy is our priority 🤱',
                     style: TextStyle(
                       fontSize: 22,
@@ -36,8 +36,8 @@ class PrivacyPolicyScreen extends StatelessWidget {
                       color: MaaColors.textDark,
                     ),
                   ),
-                  const SizedBox(height: 16),
-                  const Text(
+                  SizedBox(height: 16),
+                  Text(
                     'At MaaCare, we collect data to provide you with a personalized experience. '
                     'This includes your pregnancy stage, mood logs, and health interests.\n\n'
                     '1. Data Usage: We use your data only for personalized tips, AI responses, and community matching.\n'
@@ -46,8 +46,8 @@ class PrivacyPolicyScreen extends StatelessWidget {
                     '4. Data Deletion: You can request to delete your data at any time from the settings.',
                     style: TextStyle(fontSize: 15, height: 1.5),
                   ),
-                  const SizedBox(height: 32),
-                  const Text(
+                  SizedBox(height: 32),
+                  Text(
                     'By using this app, you agree to our privacy practices.',
                     style: TextStyle(
                       fontSize: 14,

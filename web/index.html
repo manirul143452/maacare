@@ -18,21 +18,79 @@
 
   <meta charset="UTF-8">
   <meta content="IE=Edge" http-equiv="X-UA-Compatible">
-  <meta name="description" content="A new Flutter project.">
+  <meta name="description" content="MaaCare – Pregnancy & Motherhood Support App">
 
   <!-- iOS meta tags & icons -->
   <meta name="mobile-web-app-capable" content="yes">
   <meta name="apple-mobile-web-app-status-bar-style" content="black">
   <meta name="apple-mobile-web-app-title" content="maacare">
-  <link rel="apple-touch-icon" href="icons/Icon-192.png">
+  <link rel="apple-touch-icon" href="assets/images/logo.png">
 
   <!-- Favicon -->
-  <link rel="icon" type="image/png" href="favicon.png"/>
+  <link rel="icon" type="image/png" href="assets/images/logo.png"/>
 
-  <title>maacare</title>
+  <title>MaaCare – You are never alone, Mama 💕</title>
   <link rel="manifest" href="manifest.json">
 </head>
 <body>
-  <script src="flutter_bootstrap.js" async></script>
+  <script src="flutter.js" defer></script>
+  <script>
+    window.addEventListener('load', function(ev) {
+      // Download main.dart.js
+      _flutter.loader.loadEntrypoint({
+        serviceWorker: {
+          serviceWorkerVersion: null,
+        },
+        onEntrypointLoaded: function(engineInitializer) {
+          engineInitializer.initializeEngine().then(function(appRunner) {
+            appRunner.runApp();
+          });
+        }
+      });
+    });
+  </script>
+  <!-- Razorpay Checkout -->
+  <script src="https://checkout.razorpay.com/v1/checkout.js"></script>
+  <script>
+    // Bridge function called from Flutter via dart:js
+    function openRazorpay(keyId, amount, currency, name, description, email, phone, orderId) {
+      var options = {
+        key: keyId,
+        amount: amount,
+        currency: currency || 'INR',
+        name: name || 'MaaCare',
+        description: description || 'Super Mom Premium Subscription',
+        image: 'https://maacare.co/assets/images/logo.png',
+        order_id: orderId || '',
+        handler: function(response) {
+          // Send success back to Flutter
+          if (window.razorpaySuccess) {
+            window.razorpaySuccess(response.razorpay_payment_id);
+          }
+        },
+        prefill: {
+          email: email || '',
+          contact: phone || ''
+        },
+        theme: {
+          color: '#E91E8C'
+        },
+        modal: {
+          ondismiss: function() {
+            if (window.razorpayDismiss) {
+              window.razorpayDismiss();
+            }
+          }
+        }
+      };
+      var rzp = new Razorpay(options);
+      rzp.on('payment.failed', function(response) {
+        if (window.razorpayFailed) {
+          window.razorpayFailed(response.error.description);
+        }
+      });
+      rzp.open();
+    }
+  </script>
 </body>
 </html>

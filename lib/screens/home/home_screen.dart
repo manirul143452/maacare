@@ -11,8 +11,12 @@ import 'package:google_fonts/google_fonts.dart';
 import '../../app_theme.dart';
 import '../../constants.dart';
 import '../../models/user_model.dart';
+import 'dart:async';
 import '../../providers/user_provider.dart';
+import '../../data/pregnancy_data.dart';
 import '../../services/notification_service.dart';
+import '../../widgets/loading_overlay.dart';
+import '../../utils/error_helper.dart';
 
 class HomeScreen extends StatefulWidget {
   const HomeScreen({super.key});
@@ -28,6 +32,8 @@ class _HomeScreenState extends State<HomeScreen> with TickerProviderStateMixin {
   );
   late AnimationController _pulseController;
   late Animation<double> _pulseAnimation;
+  Timer? _countdownTimer;
+  String _timeRemainingStr = "";
 
   final List<_NavItem> _navItems = const [
     _NavItem(icon: Icons.home_rounded, label: 'Home', route: '/home'),
@@ -48,15 +54,49 @@ class _HomeScreenState extends State<HomeScreen> with TickerProviderStateMixin {
       CurvedAnimation(parent: _pulseController, curve: Curves.easeInOut),
     );
     WidgetsBinding.instance.addPostFrameCallback((_) {
-      context.read<UserProvider>().loadUser();
+      _fetchData();
       NotificationService.instance.scheduleDailyMoodCheck();
+      _startCountdown();
     });
+  }
+
+  void _startCountdown() {
+    _countdownTimer?.cancel();
+    _countdownTimer = Timer.periodic(const Duration(seconds: 1), (timer) {
+      if (mounted) {
+        final user = context.read<UserProvider>().user;
+        if (user?.dueDate != null) {
+          final diff = user!.dueDate!.difference(DateTime.now());
+          if (diff.isNegative) {
+            setState(() => _timeRemainingStr = "Mama, it's Baby Day! 👶");
+          } else {
+            final days = diff.inDays;
+            final hours = diff.inHours % 24;
+            final minutes = diff.inMinutes % 60;
+            final seconds = diff.inSeconds % 60;
+            setState(() {
+              _timeRemainingStr =
+                  "${days}d : ${hours}h : ${minutes}m : ${seconds}s";
+            });
+          }
+        }
+      }
+    });
+  }
+
+  Future<void> _fetchData() async {
+    final provider = context.read<UserProvider>();
+    await provider.loadUser();
+    if (provider.error != null && mounted) {
+      ErrorHelper.showError(context, provider.error!);
+    }
   }
 
   @override
   void dispose() {
     _confetti.dispose();
     _pulseController.dispose();
+    _countdownTimer?.cancel();
     super.dispose();
   }
 
@@ -92,7 +132,14 @@ class _HomeScreenState extends State<HomeScreen> with TickerProviderStateMixin {
                   curve: Curves.easeInOut,
                 );
           }),
-          SafeArea(child: _buildBody()),
+          SafeArea(
+            child: Consumer<UserProvider>(
+              builder: (context, provider, _) => LoadingOverlay(
+                isLoading: provider.isLoading,
+                child: _buildBody(provider),
+              ),
+            ),
+          ),
           Align(
             alignment: Alignment.center,
             child: ConfettiWidget(
@@ -131,76 +178,98 @@ class _HomeScreenState extends State<HomeScreen> with TickerProviderStateMixin {
           child: FloatingActionButton(
             onPressed: () => Navigator.pushNamed(context, '/chat'),
             backgroundColor: MaaColors.pink,
-            child: const Text('🤖', style: TextStyle(fontSize: 24)),
             tooltip: 'Talk to Maa AI',
+            child: const Text('🤖', style: TextStyle(fontSize: 24)),
           ),
         );
       },
     );
   }
 
-  Widget _buildBody() {
-    return Consumer<UserProvider>(
-      builder: (context, provider, _) {
-        if (provider.isLoading) {
-          return Center(
-            child: Column(
-              mainAxisAlignment: MainAxisAlignment.center,
-              children: [
-                Container(
-                  padding: const EdgeInsets.all(24),
-                  decoration: BoxDecoration(
-                    color: MaaColors.glassBackground,
-                    borderRadius: BorderRadius.circular(20),
-                  ),
-                  child: const CircularProgressIndicator(
-                    color: MaaColors.pink,
-                    strokeWidth: 2,
-                  ),
+  Widget _buildBody(UserProvider provider) {
+    if (!provider.isLoading &&
+        provider.error != null &&
+        provider.user == null) {
+      return Center(
+        child: Padding(
+          padding: const EdgeInsets.all(24.0),
+          child: Column(
+            mainAxisAlignment: MainAxisAlignment.center,
+            children: [
+              const Icon(Icons.wifi_off_rounded,
+                  size: 64, color: MaaColors.textMuted),
+              const SizedBox(height: 16),
+              Text(
+                'Connection Lost',
+                style: GoogleFonts.poppins(
+                    fontSize: 20,
+                    fontWeight: FontWeight.bold,
+                    color: MaaColors.white),
+              ),
+              const SizedBox(height: 8),
+              Text(
+                'We couldn\'t load your amazing dashboard. Let\'s try again.',
+                textAlign: TextAlign.center,
+                style: GoogleFonts.poppins(color: MaaColors.textSecondary),
+              ),
+              const SizedBox(height: 24),
+              ElevatedButton.icon(
+                onPressed: _fetchData,
+                icon: const Icon(Icons.refresh),
+                label: const Text('Retry'),
+                style: ElevatedButton.styleFrom(
+                  backgroundColor: MaaColors.pink,
+                  foregroundColor: MaaColors.white,
                 ),
-              ],
-            ),
-          );
-        }
-
-        final user = provider.user;
-        final week = user?.pregnancyWeek ?? 0;
-        final fruitData = getBabyFruitForWeek(week);
-
-        return RefreshIndicator(
-          onRefresh: () => provider.loadUser(),
-          color: MaaColors.pink,
-          backgroundColor: MaaColors.cardDark,
-          child: SingleChildScrollView(
-            physics: const AlwaysScrollableScrollPhysics(),
-            padding: const EdgeInsets.symmetric(horizontal: 20),
-            child: Column(
-              crossAxisAlignment: CrossAxisAlignment.start,
-              children: [
-                const SizedBox(height: 16),
-                _buildHeader(user),
-                const SizedBox(height: 24),
-                _buildCuriosityTeaser(),
-                const SizedBox(height: 20),
-                _buildBabyWeekCard(week, fruitData),
-                const SizedBox(height: 20),
-                _buildMoodTracker(provider, user),
-                const SizedBox(height: 20),
-                _buildHealthSupportCard(),
-                const SizedBox(height: 20),
-                _buildPointsCard(user),
-                const SizedBox(height: 20),
-                _buildDailyTip(week),
-                const SizedBox(height: 20),
-                _buildQuickActions(),
-                const SizedBox(height: 20),
-                _buildSocialProof(),
-                const SizedBox(height: 100),
-              ],
-            ),
+              ),
+            ],
           ),
-        );
-      },
+        ),
+      );
+    }
+
+    final user = provider.user;
+    final week = user?.pregnancyWeek ?? 0;
+    final fruitData = getBabyFruitForWeek(week);
+
+    return RefreshIndicator(
+      onRefresh: _fetchData,
+      color: MaaColors.pink,
+      backgroundColor: MaaColors.cardDark,
+      child: SingleChildScrollView(
+        physics: const AlwaysScrollableScrollPhysics(),
+        padding: const EdgeInsets.symmetric(horizontal: 20),
+        child: Column(
+          crossAxisAlignment: CrossAxisAlignment.start,
+          children: [
+            const SizedBox(height: 16),
+            _buildHeader(user),
+            const SizedBox(height: 24),
+            _buildCuriosityTeaser(),
+            const SizedBox(height: 20),
+            _buildBabyWeekCard(week, fruitData),
+            const SizedBox(height: 20),
+            _buildMoodTracker(provider, user),
+            const SizedBox(height: 20),
+            if (!(user?.isPremium ?? false))
+              _buildPremiumBanner()
+                  .animate()
+                  .fadeIn(delay: 450.ms)
+                  .scale(begin: const Offset(0.9, 0.9)),
+            const SizedBox(height: 20),
+            _buildHealthSupportCard(),
+            const SizedBox(height: 20),
+            _buildPointsCard(user),
+            const SizedBox(height: 20),
+            _buildDailyTip(week),
+            const SizedBox(height: 20),
+            _buildQuickActions(),
+            const SizedBox(height: 20),
+            _buildSocialProof(),
+            const SizedBox(height: 100),
+          ],
+        ),
+      ),
     );
   }
 
@@ -338,136 +407,235 @@ class _HomeScreenState extends State<HomeScreen> with TickerProviderStateMixin {
   }
 
   Widget _buildBabyWeekCard(int week, Map<String, String> fruitData) {
+    final pregnancyInfo = getPregnancyInfoForWeek(week);
+    final title = pregnancyInfo?['title'] ?? 'Growing Miracle';
+
     return Container(
       width: double.infinity,
-      padding: const EdgeInsets.all(24),
       decoration: BoxDecoration(
-        gradient: MaaColors.primaryGradient,
-        borderRadius: BorderRadius.circular(24),
-        border: Border.all(color: MaaColors.pink.withAlpha(100)),
+        borderRadius: BorderRadius.circular(28),
         boxShadow: [
           BoxShadow(
-            color: MaaColors.pink.withAlpha(80),
-            blurRadius: 25,
-            offset: const Offset(0, 8),
-          ),
-          BoxShadow(
-            color: MaaColors.softPurple.withAlpha(40),
-            blurRadius: 40,
-            offset: const Offset(0, 12),
+            color: MaaColors.pink.withAlpha(40),
+            blurRadius: 30,
+            offset: const Offset(0, 15),
           ),
         ],
       ),
-      child: Row(
-        children: [
-          Expanded(
-            child: Column(
-              crossAxisAlignment: CrossAxisAlignment.start,
-              children: [
-                Container(
-                  padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 6),
-                  decoration: BoxDecoration(
-                    color: MaaColors.white.withAlpha(30),
-                    borderRadius: BorderRadius.circular(20),
-                  ),
-                  child: Text(
-                    'Week $week',
-                    style: GoogleFonts.poppins(
-                      color: MaaColors.white,
-                      fontSize: 14,
-                      fontWeight: FontWeight.w600,
-                    ),
-                  ),
-                ),
-                const SizedBox(height: 12),
-                Text(
-                  'Your baby is the size of',
-                  style: GoogleFonts.poppins(
-                    color: MaaColors.white.withAlpha(200),
-                    fontSize: 13,
-                  ),
-                ),
-                Text(
-                  'a ${fruitData['fruit']}! ${fruitData['emoji']}',
-                  style: GoogleFonts.poppins(
-                    color: MaaColors.white,
-                    fontSize: 20,
-                    fontWeight: FontWeight.w700,
-                  ),
-                ),
-                const SizedBox(height: 4),
-                Text(
-                  '${fruitData['size']} long 👶',
-                  style: GoogleFonts.poppins(
-                    color: MaaColors.white.withAlpha(180),
-                    fontSize: 12,
-                  ),
-                ),
-                const SizedBox(height: 16),
-                // Glowing progress bar
-                Stack(
-                  children: [
-                    Container(
-                      height: 8,
-                      decoration: BoxDecoration(
-                        color: MaaColors.white.withAlpha(30),
-                        borderRadius: BorderRadius.circular(4),
-                      ),
-                    ),
-                    FractionallySizedBox(
-                      widthFactor: (week / 40).clamp(0.0, 1.0),
-                      child: Container(
-                        height: 8,
-                        decoration: BoxDecoration(
-                          gradient: LinearGradient(
-                            colors: [
-                              MaaColors.white,
-                              MaaColors.gold,
-                            ],
-                          ),
-                          borderRadius: BorderRadius.circular(4),
-                          boxShadow: [
-                            BoxShadow(
-                              color: MaaColors.gold.withAlpha(150),
-                              blurRadius: 8,
-                              spreadRadius: 1,
-                            ),
-                          ],
-                        ),
-                      ),
-                    ),
-                  ],
-                ),
-                const SizedBox(height: 8),
-                Text(
-                  '${40 - week} weeks until you meet! 🌟',
-                  style: GoogleFonts.poppins(
-                    color: MaaColors.white.withAlpha(200),
-                    fontSize: 12,
-                    fontWeight: FontWeight.w500,
-                  ),
-                ),
-              ],
-            ),
-          ),
-          const SizedBox(width: 16),
-          Container(
-            width: 80,
-            height: 80,
-            decoration: BoxDecoration(
-              color: MaaColors.white.withAlpha(20),
-              shape: BoxShape.circle,
-            ),
-            child: Center(
-              child: Text(
-                fruitData['emoji'] ?? '👶',
-                style: const TextStyle(fontSize: 48),
+      child: ClipRRect(
+        borderRadius: BorderRadius.circular(28),
+        child: Stack(
+          children: [
+            // Weekly Background Image
+            Image.asset(
+              'images/weeks/week_$week.jpg',
+              width: double.infinity,
+              height: 220,
+              fit: BoxFit.cover,
+              errorBuilder: (_, __, ___) => Container(
+                height: 220,
+                decoration:
+                    const BoxDecoration(gradient: MaaColors.primaryGradient),
               ),
             ),
-          ).animate(onPlay: (c) => c.repeat()).shake(hz: 1, rotation: 0.03),
-        ],
+
+            // Glassmorphism Overlay
+            Positioned.fill(
+              child: Container(
+                decoration: BoxDecoration(
+                  gradient: LinearGradient(
+                    begin: Alignment.topCenter,
+                    end: Alignment.bottomCenter,
+                    colors: [
+                      Colors.black.withAlpha(50),
+                      MaaColors.background.withAlpha(200),
+                    ],
+                  ),
+                ),
+              ),
+            ),
+
+            // Content
+            Padding(
+              padding: const EdgeInsets.all(24),
+              child: Column(
+                crossAxisAlignment: CrossAxisAlignment.start,
+                children: [
+                  Row(
+                    mainAxisAlignment: MainAxisAlignment.spaceBetween,
+                    children: [
+                      Container(
+                        padding: const EdgeInsets.symmetric(
+                            horizontal: 14, vertical: 8),
+                        decoration: BoxDecoration(
+                          color: MaaColors.white.withAlpha(30),
+                          borderRadius: BorderRadius.circular(24),
+                          border:
+                              Border.all(color: MaaColors.white.withAlpha(50)),
+                        ),
+                        child: Text(
+                          'WEEK $week',
+                          style: GoogleFonts.poppins(
+                            color: MaaColors.white,
+                            fontSize: 14,
+                            fontWeight: FontWeight.w700,
+                            letterSpacing: 1.2,
+                          ),
+                        ),
+                      ),
+                      // Real-time Countdown Badge
+                      if (_timeRemainingStr.isNotEmpty)
+                        Container(
+                          padding: const EdgeInsets.symmetric(
+                              horizontal: 12, vertical: 6),
+                          decoration: BoxDecoration(
+                            color: MaaColors.pink.withAlpha(200),
+                            borderRadius: BorderRadius.circular(12),
+                            boxShadow: const [
+                              BoxShadow(
+                                  color: MaaColors.pinkGlow, blurRadius: 10),
+                            ],
+                          ),
+                          child: Text(
+                            _timeRemainingStr,
+                            style: GoogleFonts.poppins(
+                              color: MaaColors.white,
+                              fontSize: 10,
+                              fontWeight: FontWeight.w800,
+                            ),
+                          ),
+                        )
+                            .animate(onPlay: (c) => c.repeat())
+                            .shimmer(duration: 3000.ms),
+                    ],
+                  ),
+                  const SizedBox(height: 20),
+                  Text(
+                    title,
+                    style: GoogleFonts.poppins(
+                      color: MaaColors.white,
+                      fontSize: 22,
+                      fontWeight: FontWeight.w800,
+                      shadows: [
+                        const Shadow(
+                            color: Colors.black,
+                            blurRadius: 10,
+                            offset: Offset(0, 2)),
+                      ],
+                    ),
+                  ),
+                  const SizedBox(height: 8),
+                  Row(
+                    children: [
+                      Text(
+                        'Size of a ${fruitData['fruit']} ',
+                        style: GoogleFonts.poppins(
+                          color: MaaColors.white.withAlpha(220),
+                          fontSize: 14,
+                          fontWeight: FontWeight.w500,
+                        ),
+                      ),
+                      Text(
+                        fruitData['emoji'] ?? '👶',
+                        style: const TextStyle(fontSize: 18),
+                      ).animate(onPlay: (c) => c.repeat()).scale(
+                            begin: const Offset(1, 1),
+                            end: const Offset(1.3, 1.3),
+                            duration: 1000.ms,
+                            curve: Curves.easeInOut,
+                          ),
+                    ],
+                  ),
+                  const SizedBox(height: 20),
+
+                  // Shimmering Progress Bar
+                  Stack(
+                    children: [
+                      Container(
+                        height: 10,
+                        decoration: BoxDecoration(
+                          color: MaaColors.white.withAlpha(30),
+                          borderRadius: BorderRadius.circular(6),
+                        ),
+                      ),
+                      FractionallySizedBox(
+                        widthFactor: (week / 40).clamp(0.0, 1.0),
+                        child: Container(
+                          height: 10,
+                          decoration: BoxDecoration(
+                            gradient: const LinearGradient(
+                              colors: [
+                                MaaColors.gold,
+                                MaaColors.pink,
+                                MaaColors.white
+                              ],
+                            ),
+                            borderRadius: BorderRadius.circular(6),
+                            boxShadow: [
+                              BoxShadow(
+                                color: MaaColors.gold.withAlpha(150),
+                                blurRadius: 12,
+                                spreadRadius: 2,
+                              ),
+                            ],
+                          ),
+                        )
+                            .animate(onPlay: (c) => c.repeat())
+                            .shimmer(duration: 5000.ms),
+                      ),
+                    ],
+                  ),
+                  const SizedBox(height: 12),
+                  Row(
+                    mainAxisAlignment: MainAxisAlignment.spaceBetween,
+                    children: [
+                      Text(
+                        '${40 - week} weeks to meet! 🌟',
+                        style: GoogleFonts.poppins(
+                          color: MaaColors.white.withAlpha(200),
+                          fontSize: 12,
+                          fontWeight: FontWeight.w600,
+                        ),
+                      ),
+                      GestureDetector(
+                        onTap: () => Navigator.pushNamed(context, '/tracker'),
+                        child: Container(
+                          padding: const EdgeInsets.symmetric(
+                              horizontal: 12, vertical: 6),
+                          decoration: BoxDecoration(
+                            color: MaaColors.white.withAlpha(20),
+                            borderRadius: BorderRadius.circular(20),
+                            border: Border.all(
+                                color: MaaColors.white.withAlpha(40)),
+                          ),
+                          child: Row(
+                            children: [
+                              Text(
+                                'Guide ',
+                                style: GoogleFonts.poppins(
+                                  color: MaaColors.white,
+                                  fontSize: 10,
+                                  fontWeight: FontWeight.w700,
+                                ),
+                              ),
+                              const Icon(Icons.arrow_forward_ios_rounded,
+                                  color: MaaColors.white, size: 8),
+                            ],
+                          ),
+                        ),
+                      ),
+                    ],
+                  ),
+                ],
+              ),
+            ),
+          ],
+        ),
       ),
-    ).animate().slideY(begin: 0.1, end: 0, curve: Curves.easeOutBack).fadeIn();
+    )
+        .animate()
+        .fadeIn(duration: 800.ms)
+        .slideY(begin: 0.1, end: 0, curve: Curves.easeOutBack);
   }
 
   Widget _buildMoodTracker(UserProvider provider, UserModel? user) {
@@ -503,15 +671,8 @@ class _HomeScreenState extends State<HomeScreen> with TickerProviderStateMixin {
               await provider.updateMood(mood);
               _confetti.play();
               if (mounted) {
-                ScaffoldMessenger.of(context).showSnackBar(
-                  SnackBar(
-                    content: const Text('Mood logged! You\'re amazing! +5 ⭐'),
-                    behavior: SnackBarBehavior.floating,
-                    shape: RoundedRectangleBorder(
-                        borderRadius: BorderRadius.circular(12)),
-                    backgroundColor: MaaColors.cardLight,
-                  ),
-                );
+                ErrorHelper.showSuccess(
+                    context, 'Mood logged! You\'re amazing! +5 ⭐');
               }
             },
           ),
@@ -600,9 +761,7 @@ class _HomeScreenState extends State<HomeScreen> with TickerProviderStateMixin {
                   child: const Center(
                     child: Text('❤️', style: TextStyle(fontSize: 24)),
                   ),
-                )
-                    .animate(onPlay: (c) => c.repeat())
-                    .scale(
+                ).animate(onPlay: (c) => c.repeat()).scale(
                       begin: const Offset(1, 1),
                       end: const Offset(1.1, 1.1),
                       duration: 800.ms,
@@ -623,11 +782,11 @@ class _HomeScreenState extends State<HomeScreen> with TickerProviderStateMixin {
                       const SizedBox(height: 6),
                       ClipRRect(
                         borderRadius: BorderRadius.circular(4),
-                        child: LinearProgressIndicator(
+                        child: const LinearProgressIndicator(
                           value: 0.75,
                           backgroundColor: MaaColors.cardDark,
                           valueColor:
-                              const AlwaysStoppedAnimation<Color>(MaaColors.pink),
+                              AlwaysStoppedAnimation<Color>(MaaColors.pink),
                           minHeight: 6,
                         ),
                       ),
@@ -659,7 +818,8 @@ class _HomeScreenState extends State<HomeScreen> with TickerProviderStateMixin {
                   borderRadius: BorderRadius.circular(16),
                 ),
               ),
-              icon: const Icon(Icons.video_call_rounded, color: MaaColors.white),
+              icon:
+                  const Icon(Icons.video_call_rounded, color: MaaColors.white),
               label: Text(
                 'Doctor in 1 Tap',
                 style: GoogleFonts.poppins(
@@ -823,12 +983,12 @@ class _HomeScreenState extends State<HomeScreen> with TickerProviderStateMixin {
 
   Widget _buildQuickActions() {
     final actions = [
-      _QuickAction('💬', 'Maa AI', '/chat', MaaColors.pink),
-      _QuickAction('📊', 'Tracker', '/tracker', MaaColors.softPurple),
-      _QuickAction('🩺', 'Symptoms', '/symptoms', MaaColors.warning),
-      _QuickAction('🧘', 'Self Care', '/selfcare', MaaColors.softGreen),
-      _QuickAction('🍱', 'Nutrition', '/nutrition', MaaColors.lightBlue),
-      _QuickAction('💉', 'Vaccines', '/vaccinations', MaaColors.peach),
+      const _QuickAction('💬', 'Maa AI', '/chat', MaaColors.pink),
+      const _QuickAction('📊', 'Tracker', '/tracker', MaaColors.softPurple),
+      const _QuickAction('🩺', 'Symptoms', '/symptoms', MaaColors.warning),
+      const _QuickAction('🧘', 'Self Care', '/selfcare', MaaColors.softGreen),
+      const _QuickAction('🍱', 'Nutrition', '/nutrition', MaaColors.lightBlue),
+      const _QuickAction('💉', 'Vaccines', '/vaccinations', MaaColors.peach),
     ];
 
     return Column(
@@ -877,7 +1037,8 @@ class _HomeScreenState extends State<HomeScreen> with TickerProviderStateMixin {
                         color: a.color.withAlpha(20),
                         borderRadius: BorderRadius.circular(12),
                       ),
-                      child: Text(a.emoji, style: const TextStyle(fontSize: 24)),
+                      child:
+                          Text(a.emoji, style: const TextStyle(fontSize: 24)),
                     ),
                     const SizedBox(height: 8),
                     Text(
@@ -892,10 +1053,8 @@ class _HomeScreenState extends State<HomeScreen> with TickerProviderStateMixin {
                   ],
                 ),
               ),
-            )
-                .animate()
-                .fadeIn(delay: (800 + index * 50).ms)
-                .scale(begin: const Offset(0.9, 0.9), curve: Curves.easeOutBack);
+            ).animate().fadeIn(delay: (800 + index * 50).ms).scale(
+                begin: const Offset(0.9, 0.9), curve: Curves.easeOutBack);
           }).toList(),
         ),
       ],
@@ -927,9 +1086,7 @@ class _HomeScreenState extends State<HomeScreen> with TickerProviderStateMixin {
                 ),
               ],
             ),
-          )
-              .animate(onPlay: (c) => c.repeat())
-              .scale(
+          ).animate(onPlay: (c) => c.repeat()).scale(
                 begin: const Offset(1, 1),
                 end: const Offset(1.3, 1.3),
                 duration: 1000.ms,
@@ -975,12 +1132,76 @@ class _HomeScreenState extends State<HomeScreen> with TickerProviderStateMixin {
           Navigator.pushNamed(context, _navItems[index].route);
         },
         destinations: _navItems
-            .map((item) => NavigationDestination(
+            .map<NavigationDestination>((item) => NavigationDestination(
                   icon: Icon(item.icon, color: MaaColors.textMuted),
                   selectedIcon: Icon(item.icon, color: MaaColors.pink),
                   label: item.label,
                 ))
             .toList(),
+      ),
+    );
+  }
+
+  Widget _buildPremiumBanner() {
+    return Container(
+      width: double.infinity,
+      padding: const EdgeInsets.all(24),
+      decoration: BoxDecoration(
+        gradient: MaaColors.goldGradient,
+        borderRadius: BorderRadius.circular(24),
+        boxShadow: [
+          BoxShadow(
+            color: MaaColors.gold.withAlpha(80),
+            blurRadius: 20,
+            offset: const Offset(0, 8),
+          ),
+        ],
+      ),
+      child: Row(
+        children: [
+          Expanded(
+            child: Column(
+              crossAxisAlignment: CrossAxisAlignment.start,
+              children: [
+                Text(
+                  'Join Super Mom Club! 👑',
+                  style: GoogleFonts.poppins(
+                    color: MaaColors.white,
+                    fontSize: 18,
+                    fontWeight: FontWeight.w700,
+                  ),
+                ),
+                const SizedBox(height: 4),
+                Text(
+                  'Unlock unlimited AI chat, priority doctor visits, and 20+ premium perks.',
+                  style: GoogleFonts.poppins(
+                    color: MaaColors.white.withAlpha(200),
+                    fontSize: 12,
+                  ),
+                ),
+                const SizedBox(height: 16),
+                ElevatedButton(
+                  onPressed: () =>
+                      Navigator.pushNamed(context, '/subscription'),
+                  style: ElevatedButton.styleFrom(
+                    backgroundColor: MaaColors.white,
+                    foregroundColor: MaaColors.gold,
+                    shape: RoundedRectangleBorder(
+                        borderRadius: BorderRadius.circular(12)),
+                  ),
+                  child: Text(
+                    'Try it Now! 🚀',
+                    style: GoogleFonts.poppins(fontWeight: FontWeight.w700),
+                  ),
+                ),
+              ],
+            ),
+          ),
+          const SizedBox(width: 16),
+          const Text('🎁', style: TextStyle(fontSize: 48))
+              .animate(onPlay: (c) => c.repeat())
+              .shake(hz: 1, rotation: 0.1),
+        ],
       ),
     );
   }

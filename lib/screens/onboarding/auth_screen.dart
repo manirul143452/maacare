@@ -1,15 +1,18 @@
-// ============================================================
-//  AuthScreen – MaaCare Premium Dark Authentication
-//  Cinematic, mysterious, and high-fidelity entry
-// ============================================================
-
+// ignore_for_file: deprecated_member_use
+import 'dart:convert';
+import 'package:http/http.dart' as http;
 import 'package:flutter/material.dart';
 import 'package:provider/provider.dart';
+import 'package:shared_preferences/shared_preferences.dart';
 import 'package:flutter_animate/flutter_animate.dart';
 import 'package:google_fonts/google_fonts.dart';
+import 'dart:ui' show ImageFilter;
 import '../../app_theme.dart';
+import '../../constants.dart';
 import '../../services/insforge_service.dart';
 import '../../providers/user_provider.dart';
+import '../../utils/error_helper.dart';
+import '../../widgets/loading_overlay.dart';
 
 class AuthScreen extends StatefulWidget {
   const AuthScreen({super.key});
@@ -18,7 +21,7 @@ class AuthScreen extends StatefulWidget {
   State<AuthScreen> createState() => _AuthScreenState();
 }
 
-class _AuthScreenState extends State<AuthScreen> with TickerProviderStateMixin {
+class _AuthScreenState extends State<AuthScreen> {
   bool _isLogin = true;
   bool _isLoading = false;
   final _formKey = GlobalKey<FormState>();
@@ -40,47 +43,67 @@ class _AuthScreenState extends State<AuthScreen> with TickerProviderStateMixin {
     setState(() => _isLoading = true);
     
     try {
-      bool success;
-      if (_isLogin) {
-        success = await InsForgeService.instance.signIn(
-          email: _emailController.text.trim(),
-          password: _passwordController.text.trim(),
-        );
+      bool success = false;
+      String? errorMessage;
+
+      final url = Uri.parse('${AppConstants.insForgeUrl}/api/auth/${_isLogin ? 'sessions' : 'users'}');
+      
+      final response = await http.post(
+        url,
+        headers: {
+          'Content-Type': 'application/json',
+          'Authorization': 'Bearer ${AppConstants.insForgeAnonKey}',
+        },
+        body: jsonEncode({
+          'email': _emailController.text.trim(),
+          'password': _passwordController.text.trim(),
+          if (!_isLogin && _nameController.text.trim().isNotEmpty) 'name': _nameController.text.trim(),
+        }),
+      );
+
+      if (response.statusCode == 200 || response.statusCode == 201) {
+        if (response.body.isNotEmpty) {
+          final data = jsonDecode(response.body);
+          if (data['accessToken'] == null || data['requireEmailVerification'] == true) {
+            errorMessage = 'email_verification_required';
+          } else {
+            // Save Token Manually
+            final prefs = await SharedPreferences.getInstance();
+            await prefs.setString('insforge_token', data['accessToken']);
+            await InsForgeService.instance.loadSession(); // reload singleton context
+            success = true;
+          }
+        } else {
+           // Body is empty, but status is 200/201. This occurs if email confirmation is required but no token is returned.
+           errorMessage = 'email_verification_required';
+        }
       } else {
-        success = await InsForgeService.instance.signUp(
-          email: _emailController.text.trim(),
-          password: _passwordController.text.trim(),
-          name: _nameController.text.trim(),
-        );
+        errorMessage = 'HTTP ${response.statusCode}: ${response.body}';
       }
 
-      if (success && mounted) {
-        // Load the user profile into the provider
+      if (!mounted) return;
+
+      if (success) {
         await context.read<UserProvider>().loadUser();
+        if (!mounted) return;
         
-        if (mounted) {
-          final user = context.read<UserProvider>().user;
-          if (user == null) {
-            // First time user, go to onboarding
-            Navigator.pushReplacementNamed(context, '/onboarding');
-          } else {
-            // Returning user, go home
-            Navigator.pushReplacementNamed(context, '/home');
-          }
+        final user = context.read<UserProvider>().user;
+        if (user == null) {
+          Navigator.pushReplacementNamed(context, '/onboarding');
+        } else {
+          Navigator.pushReplacementNamed(context, '/home');
         }
-      } else if (mounted) {
-        ScaffoldMessenger.of(context).showSnackBar(
-          SnackBar(
-            content: Text(_isLogin ? 'Login failed. Check your credentials.' : 'Signup failed. Email may be in use.'),
-            backgroundColor: MaaColors.error,
-          ),
-        );
+      } else {
+        if (!_isLogin && errorMessage == 'email_verification_required') {
+          ErrorHelper.showSuccess(context, 'Verification sent! Please check your email.');
+          _toggleMode();
+        } else {
+          ErrorHelper.showError(context, errorMessage ?? 'Authentication failed');
+        }
       }
     } catch (e) {
       if (mounted) {
-        ScaffoldMessenger.of(context).showSnackBar(
-          const SnackBar(content: Text('Connection error. Please try again.')),
-        );
+        ErrorHelper.showError(context, 'Exception: $e');
       }
     } finally {
       if (mounted) setState(() => _isLoading = false);
@@ -88,120 +111,212 @@ class _AuthScreenState extends State<AuthScreen> with TickerProviderStateMixin {
   }
 
   @override
+  void dispose() {
+    _emailController.dispose();
+    _passwordController.dispose();
+    _nameController.dispose();
+    super.dispose();
+  }
+
+  @override
   Widget build(BuildContext context) {
     return Scaffold(
-      backgroundColor: MaaColors.background,
-      body: Stack(
-        children: [
-          // Cinematic Background
-          const ParticleBackgroundView(),
+      backgroundColor: const Color(0xFF0F0B1E),
+      body: LoadingOverlay(
+        isLoading: _isLoading,
+        child: Stack(
+          children: [
+          // Ambient Glows
+          Positioned(
+            top: -100,
+            left: -100,
+            child: Container(
+              width: 300,
+              height: 300,
+              decoration: const BoxDecoration(
+                shape: BoxShape.circle,
+                gradient: RadialGradient(
+                  colors: [Color(0x40D4A5FF), Colors.transparent],
+                ),
+              ),
+            ),
+          ).animate(onPlay: (c) => c.repeat(reverse: true)).scale(
+            duration: 4.seconds,
+            begin: const Offset(1, 1),
+            end: const Offset(1.2, 1.2),
+          ),
+          Positioned(
+            bottom: -50,
+            right: -50,
+            child: Container(
+              width: 250,
+              height: 250,
+              decoration: const BoxDecoration(
+                shape: BoxShape.circle,
+                gradient: RadialGradient(
+                  colors: [Color(0x30FF6B6B), Colors.transparent],
+                ),
+              ),
+            ),
+          ).animate(onPlay: (c) => c.repeat(reverse: true)).scale(
+            duration: 3.seconds,
+            begin: const Offset(1, 1),
+            end: const Offset(1.1, 1.1),
+          ),
           
           SafeArea(
             child: Center(
               child: SingleChildScrollView(
-                padding: const EdgeInsets.all(32),
+                padding: const EdgeInsets.symmetric(horizontal: 24, vertical: 32),
                 child: Column(
                   mainAxisAlignment: MainAxisAlignment.center,
                   children: [
-                    // Logo/Hook
                     Container(
                       padding: const EdgeInsets.all(20),
                       decoration: BoxDecoration(
                         shape: BoxShape.circle,
-                        color: MaaColors.pink.withAlpha(20),
-                        border: Border.all(color: MaaColors.pink.withAlpha(50)),
+                        color: Colors.white,
+                        border: Border.all(color: Colors.white.withOpacity(0.1)),
+                        boxShadow: [
+                          BoxShadow(
+                            color: MaaColors.pink.withOpacity(0.2),
+                            blurRadius: 30,
+                            spreadRadius: 5,
+                          )
+                        ]
                       ),
-                      child: const Text('🤱', style: TextStyle(fontSize: 60)),
-                    ).animate().scale(duration: 800.ms, curve: Curves.elasticOut),
+                      child: Center(
+                        child: Image.asset(
+                          'assets/images/logo.png',
+                          width: 80,
+                          height: 80,
+                          fit: BoxFit.contain,
+                        ),
+                      ),
+                    ).animate().scale(duration: 800.ms, curve: Curves.easeOutBack),
                     
                     const SizedBox(height: 24),
                     
                     Text(
                       _isLogin ? 'Welcome Back, Mama' : 'Join the Sisterhood',
-                      style: GoogleFonts.poppins(
+                      style: GoogleFonts.outfit(
                         fontSize: 28,
                         fontWeight: FontWeight.w700,
-                        color: MaaColors.textPrimary,
+                        color: Colors.white,
                         letterSpacing: -0.5,
                       ),
                     ).animate().fadeIn(delay: 200.ms).moveY(begin: 10, end: 0),
                     
+                    const SizedBox(height: 8),
+                    
                     Text(
                       _isLogin ? 'Sign in to your sacred space' : 'Start your beautiful journey with us',
-                      style: GoogleFonts.poppins(
-                        fontSize: 14,
-                        color: MaaColors.textSecondary,
+                      style: GoogleFonts.outfit(
+                        fontSize: 15,
+                        color: Colors.white70,
                       ),
+                      textAlign: TextAlign.center,
                     ).animate().fadeIn(delay: 400.ms),
                     
-                    const SizedBox(height: 40),
+                    const SizedBox(height: 48),
                     
-                    // Auth Form
-                    GlassContainer(
-                      child: Form(
-                        key: _formKey,
-                        child: Column(
-                          children: [
-                            if (!_isLogin) ...[
-                              TextFormField(
-                                controller: _nameController,
-                                decoration: const InputDecoration(
-                                  hintText: 'Full Name',
-                                  prefixIcon: Icon(Icons.person_outline, size: 20),
+                    ClipRRect(
+                      borderRadius: BorderRadius.circular(24),
+                      child: BackdropFilter(
+                        filter: ImageFilter.blur(sigmaX: 15, sigmaY: 15),
+                        child: Container(
+                          padding: const EdgeInsets.all(32),
+                          decoration: BoxDecoration(
+                            color: Colors.white.withOpacity(0.05),
+                            borderRadius: BorderRadius.circular(24),
+                            border: Border.all(color: Colors.white.withOpacity(0.1)),
+                          ),
+                          child: Form(
+                            key: _formKey,
+                            child: Column(
+                              children: [
+                                if (!_isLogin) ...[
+                                  _buildTextField(
+                                    controller: _nameController,
+                                    hint: 'What should we call you?',
+                                    icon: Icons.person_outline,
+                                    validator: (v) => v!.isEmpty ? 'Name required' : null,
+                                  ),
+                                  const SizedBox(height: 16),
+                                ],
+                                
+                                _buildTextField(
+                                  controller: _emailController,
+                                  hint: 'Email Address',
+                                  icon: Icons.alternate_email,
+                                  keyboardType: TextInputType.emailAddress,
+                                  validator: (v) {
+                                    if (v!.isEmpty) return 'Email required';
+                                    if (!v.contains('@')) return 'Invalid email';
+                                    return null;
+                                  },
                                 ),
-                                validator: (val) => val == null || val.isEmpty ? 'Name required' : null,
-                              ).animate().fadeIn(delay: 100.ms),
-                              const SizedBox(height: 16),
-                            ],
-                            TextFormField(
-                              controller: _emailController,
-                              keyboardType: TextInputType.emailAddress,
-                              decoration: const InputDecoration(
-                                hintText: 'Email Address',
-                                prefixIcon: Icon(Icons.email_outlined, size: 20),
-                              ),
-                              validator: (val) => val == null || !val.contains('@') ? 'Invalid email' : null,
-                            ).animate().fadeIn(delay: 200.ms),
-                            const SizedBox(height: 16),
-                            TextFormField(
-                              controller: _passwordController,
-                              obscureText: true,
-                              decoration: const InputDecoration(
-                                hintText: 'Password',
-                                prefixIcon: Icon(Icons.lock_outline, size: 20),
-                              ),
-                              validator: (val) => val == null || val.length < 6 ? 'Min. 6 chars' : null,
-                            ).animate().fadeIn(delay: 300.ms),
-                            const SizedBox(height: 32),
-                            
-                            NeonButton(
-                              label: _isLogin ? 'Sign In' : 'Create Account',
-                              isLoading: _isLoading,
-                              onPressed: _submit,
-                            ).animate().fadeIn(delay: 400.ms),
-                          ],
+                                const SizedBox(height: 16),
+                                
+                                _buildTextField(
+                                  controller: _passwordController,
+                                  hint: 'Password',
+                                  icon: Icons.lock_outline,
+                                  obscureText: true,
+                                  validator: (v) => v!.length < 6 ? 'Min 6 characters' : null,
+                                ),
+                                
+                                const SizedBox(height: 32),
+                                
+                                SizedBox(
+                                  width: double.infinity,
+                                  height: 56,
+                                  child: ElevatedButton(
+                                    onPressed: _isLoading ? null : _submit,
+                                    style: ElevatedButton.styleFrom(
+                                      backgroundColor: MaaColors.pink,
+                                      foregroundColor: Colors.white,
+                                      shape: RoundedRectangleBorder(
+                                        borderRadius: BorderRadius.circular(16),
+                                      ),
+                                      elevation: 8,
+                                      shadowColor: MaaColors.pink.withOpacity(0.5),
+                                    ),
+                                    child: _isLoading
+                                        ? const SizedBox(
+                                            height: 24,
+                                            width: 24,
+                                            child: CircularProgressIndicator(color: Colors.white, strokeWidth: 3),
+                                          )
+                                        : Text(
+                                            _isLogin ? 'Sign In' : 'Create Account',
+                                            style: GoogleFonts.outfit(
+                                              fontSize: 16,
+                                              fontWeight: FontWeight.w600,
+                                              letterSpacing: 1,
+                                            ),
+                                          ),
+                                  ),
+                                ),
+                              ],
+                            ),
+                          ),
                         ),
                       ),
-                    ).animate().fadeIn(delay: 500.ms).moveY(begin: 20, end: 0),
+                    ).animate().fadeIn(delay: 600.ms).moveY(begin: 20, end: 0),
                     
                     const SizedBox(height: 24),
                     
-                    // Toggle Mode
                     TextButton(
-                      onPressed: _toggleMode,
-                      child: RichText(
-                        text: TextSpan(
-                          text: _isLogin ? "Don't have an account? " : "Already a member? ",
-                          style: GoogleFonts.poppins(color: MaaColors.textSecondary, fontSize: 13),
-                          children: [
-                            TextSpan(
-                              text: _isLogin ? "Sign Up" : "Log In",
-                              style: const TextStyle(color: MaaColors.pink, fontWeight: FontWeight.bold),
-                            ),
-                          ],
+                      onPressed: _isLoading ? null : _toggleMode,
+                      child: Text(
+                        _isLogin ? "Don't have an account? Sign Up" : "Already have an account? Log In",
+                        style: GoogleFonts.outfit(
+                          color: Colors.white60,
+                          fontWeight: FontWeight.w500,
                         ),
                       ),
-                    ).animate().fadeIn(delay: 700.ms),
+                    ).animate().fadeIn(delay: 800.ms),
                   ],
                 ),
               ),
@@ -209,44 +324,47 @@ class _AuthScreenState extends State<AuthScreen> with TickerProviderStateMixin {
           ),
         ],
       ),
+      ),
     );
   }
-}
 
-class ParticleBackgroundView extends StatelessWidget {
-  const ParticleBackgroundView({super.key});
-
-  @override
-  Widget build(BuildContext context) {
-    return Stack(
-      children: [
-        Container(
-          decoration: const BoxDecoration(
-            gradient: MaaColors.darkGradient,
-          ),
+  Widget _buildTextField({
+    required TextEditingController controller,
+    required String hint,
+    required IconData icon,
+    bool obscureText = false,
+    TextInputType? keyboardType,
+    String? Function(String?)? validator,
+  }) {
+    return TextFormField(
+      controller: controller,
+      obscureText: obscureText,
+      keyboardType: keyboardType,
+      style: const TextStyle(color: Colors.white),
+      decoration: InputDecoration(
+        hintText: hint,
+        hintStyle: TextStyle(color: Colors.white.withOpacity(0.4)),
+        prefixIcon: Icon(icon, color: Colors.white.withOpacity(0.6)),
+        filled: true,
+        fillColor: Colors.black.withOpacity(0.3),
+        border: OutlineInputBorder(
+          borderRadius: BorderRadius.circular(16),
+          borderSide: BorderSide.none,
         ),
-        ...List.generate(25, (index) {
-          final random = index * 41 % 100;
-          final size = 1.0 + (index % 3);
-          return Positioned(
-            left: (random * 3.6) % MediaQuery.of(context).size.width,
-            top: (random * 5.2) % MediaQuery.of(context).size.height,
-            child: Container(
-              width: size,
-              height: size,
-              decoration: BoxDecoration(
-                shape: BoxShape.circle,
-                color: MaaColors.pink.withAlpha(50),
-              ),
-            ),
-          ).animate(onPlay: (c) => c.repeat()).moveY(
-                begin: 0,
-                end: -50,
-                duration: Duration(seconds: 5 + (index % 5)),
-                curve: Curves.easeInOut,
-              );
-        }),
-      ],
+        enabledBorder: OutlineInputBorder(
+          borderRadius: BorderRadius.circular(16),
+          borderSide: BorderSide.none,
+        ),
+        focusedBorder: OutlineInputBorder(
+          borderRadius: BorderRadius.circular(16),
+          borderSide: BorderSide(color: MaaColors.pink.withOpacity(0.5), width: 1.5),
+        ),
+        errorBorder: OutlineInputBorder(
+          borderRadius: BorderRadius.circular(16),
+          borderSide: BorderSide(color: MaaColors.error.withOpacity(0.8), width: 1),
+        ),
+      ),
+      validator: validator,
     );
   }
 }

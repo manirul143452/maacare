@@ -7,18 +7,20 @@ class AppConstants {
   AppConstants._();
 
   // --------------- InsForge ---------------
-  static const String insForgeUrl = 'https://89wh46c8.ap-southeast.insforge.app';
-  static const String insForgeAnonKey = 'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJzdWIiOiIxMjM0NTY3OC0xMjM0LTU2NzgtOTBhYi1jZGVmMTIzNDU2NzgiLCJlbWFpbCI6ImFub25AaW5zZm9yZ2UuY29tIiwicm9sZSI6ImFub24iLCJpYXQiOjE3NzIyMDA0Mzl9.N-iktTutln0hD9vWz3qpdqhpDMKgn79cjyMnNYsfwZ0';
+  static const String insForgeUrl = 'https://96if48kf.ap-southeast.insforge.app';
+  static const String insForgeAnonKey = 'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJzdWIiOiIxMjM0NTY3OC0xMjM0LTU2NzgtOTBhYi1jZGVmMTIzNDU2NzgiLCJlbWFpbCI6ImFub25AaW5zZm9yZ2UuY29tIiwicm9sZSI6ImFub24iLCJpYXQiOjE3NzUxMDQwOTF9.VaMaOGNQNj8XlUFSiBCxaOmxjTcfxc6Bxkb6LDLY0J0';
 
 
   // --------------- xAI Grok (Fallback AI) ---------------
-  static const String xaiApiKey = 'YOUR_XAI_API_KEY';
+  // Note: The API key has been securely moved to InsForge Edge Functions.
+  // We no longer store it in the client code!
   static const String xaiBaseUrl = 'https://api.x.ai/v1/chat/completions';
   static const String xaiModel = 'grok-4-latest';
 
   // --------------- Razorpay ---------------
   // Get from: https://dashboard.razorpay.com
-  static const String razorpayKey = 'YOUR_RAZORPAY_KEY_ID';
+  static const String razorpayKey = 'rzp_live_SZ3jBvF1B5bVgt';
+  // ⚠️ Key Secret is stored in InsForge Edge Function only — NEVER in client code
 
   // --------------- App Info ---------------
   static const String appName = 'MaaCare';

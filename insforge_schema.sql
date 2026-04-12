@@ -117,14 +117,90 @@ CREATE POLICY "Manage own vaccinations" ON public.vaccinations FOR ALL USING (tr
 
 -- ─────────────────── Realtime Publication ───────────────────
 -- InsForge Realtime Setup
-BEGIN;
-  DO $$ 
-  BEGIN
-    IF NOT EXISTS (SELECT 1 FROM pg_publication WHERE pubname = 'insforge_realtime') THEN
-      CREATE PUBLICATION insforge_realtime;
-    END IF;
-  END $$;
-  
-  ALTER PUBLICATION insforge_realtime ADD TABLE chats;
-  ALTER PUBLICATION insforge_realtime ADD TABLE posts;
-COMMIT;
+-- Note: Requires `realtime` schema to be created by the InsForge core engine.
+INSERT INTO realtime.channels (pattern, description, enabled)
+VALUES 
+  ('chats:%', 'Chat updates per conversation', true),
+  ('posts:all', 'Global community posts', true)
+ON CONFLICT DO NOTHING;
+
+-- Trigger Function for Chats
+CREATE OR REPLACE FUNCTION notify_chat_changes()
+RETURNS TRIGGER AS $$
+BEGIN
+  PERFORM realtime.publish(
+    'chats:' || NEW.conversation_id::text,
+    'INSERT_chat',
+    jsonb_strip_nulls(to_jsonb(NEW))
+  );
+  RETURN NEW;
+END;
+$$ LANGUAGE plpgsql SECURITY DEFINER;
+
+DROP TRIGGER IF EXISTS chat_realtime_trigger ON public.chats;
+CREATE TRIGGER chat_realtime_trigger
+  AFTER INSERT ON public.chats
+  FOR EACH ROW
+  EXECUTE FUNCTION notify_chat_changes();
+
+-- Trigger Function for Posts
+CREATE OR REPLACE FUNCTION notify_post_changes()
+RETURNS TRIGGER AS $$
+BEGIN
+  PERFORM realtime.publish(
+    'posts:all',
+    'INSERT_post',
+    jsonb_strip_nulls(to_jsonb(NEW))
+  );
+  RETURN NEW;
+
+END;
+$$ LANGUAGE plpgsql SECURITY DEFINER;
+
+DROP TRIGGER IF EXISTS post_realtime_trigger ON public.posts;
+CREATE TRIGGER post_realtime_trigger
+  AFTER INSERT ON public.posts
+  FOR EACH ROW
+  EXECUTE FUNCTION notify_post_changes();
+
+-- ─────────────────── Doctors ───────────────────
+CREATE TABLE IF NOT EXISTS public.doctors (
+  id             UUID PRIMARY KEY DEFAULT gen_random_uuid(),
+  user_id        UUID REFERENCES public.users(id) ON DELETE CASCADE,
+  name           TEXT NOT NULL,
+  specialization TEXT NOT NULL,
+  experience     TEXT,
+  rating         TEXT DEFAULT '5.0',
+  fee            TEXT,
+  bio            TEXT,
+  available_hours TEXT,
+  avatar_url     TEXT,
+  license_url    TEXT,
+  emoji          TEXT DEFAULT '👩‍⚕️',
+  is_verified    BOOLEAN DEFAULT false,
+  status         TEXT DEFAULT 'pending',
+  clinic_location TEXT,
+  created_at     TIMESTAMPTZ DEFAULT NOW()
+);
+
+ALTER TABLE public.doctors ENABLE ROW LEVEL SECURITY;
+CREATE POLICY "Doctors public read" ON public.doctors FOR SELECT USING (true);
+CREATE POLICY "Doctors can manage profile" ON public.doctors FOR ALL USING (true);
+
+-- ─────────────────── Appointments ───────────────────
+CREATE TABLE IF NOT EXISTS public.appointments (
+  id               UUID PRIMARY KEY DEFAULT gen_random_uuid(),
+  user_id          UUID REFERENCES public.users(id) ON DELETE CASCADE,
+  doctor_id        UUID REFERENCES public.doctors(id) ON DELETE CASCADE,
+  patient_name     TEXT NOT NULL,
+  symptoms         TEXT,
+  appointment_date TIMESTAMPTZ NOT NULL,
+  status           TEXT DEFAULT 'scheduled',
+  payment_status   TEXT DEFAULT 'pending',
+  meeting_link     TEXT,
+  amount           TEXT,
+  created_at       TIMESTAMPTZ DEFAULT NOW()
+);
+
+ALTER TABLE public.appointments ENABLE ROW LEVEL SECURITY;
+CREATE POLICY "Users can manage own appointments" ON public.appointments FOR ALL USING (true);

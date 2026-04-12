@@ -3,7 +3,6 @@ import 'package:provider/provider.dart';
 import 'package:confetti/confetti.dart';
 import 'package:smooth_page_indicator/smooth_page_indicator.dart';
 import 'package:flutter_animate/flutter_animate.dart';
-import 'package:uuid/uuid.dart';
 import '../../app_theme.dart';
 import '../../models/user_model.dart';
 import '../../providers/user_provider.dart';
@@ -45,11 +44,13 @@ class _OnboardingScreenState extends State<OnboardingScreen> {
       _showSnack('Please tell us your name 🌸');
       return;
     }
-    if (_currentPage == 2 && _dueDate == null) { // Adjusted indices for new step
+    if (_currentPage == 2 && _dueDate == null) {
+      // Adjusted indices for new step
       _showSnack('Please pick your due date 💕');
       return;
     }
-    if (_currentPage < 3) { // 4 steps total
+    if (_currentPage < 3) {
+      // 4 steps total
       _pageController.nextPage(
         duration: const Duration(milliseconds: 600),
         curve: Curves.easeOutBack,
@@ -86,13 +87,13 @@ class _OnboardingScreenState extends State<OnboardingScreen> {
     setState(() => _isSubmitting = true);
 
     try {
-      // Get the real user ID from InsForge Auth
-      final currentUser = await context.read<UserProvider>().loadUser().then((_) => context.read<UserProvider>().user == null ? InsForgeService.instance.getCurrentUser() : null);
-      
-      final String? userId = (await InsForgeService.instance.getCurrentUser())?['id'];
+      final String? userId = InsForgeService.instance.getCurrentUserId();
 
       if (userId == null) {
-        throw Exception('User not authenticated');
+        final tokenStatus = InsForgeService.instance.isLoggedIn
+            ? '(Token Length: ${InsForgeService.instance.debugTokenLength()})'
+            : 'Token is NULL';
+        throw Exception('User not authenticated! $tokenStatus');
       }
 
       final user = UserModel(
@@ -111,7 +112,8 @@ class _OnboardingScreenState extends State<OnboardingScreen> {
       if (!mounted) return;
       Navigator.pushReplacementNamed(context, '/home');
     } catch (e) {
-      if (mounted) _showSnack('Oops, baby is napping – try again! 👶');
+      debugPrint('ONBOARDING EXCEPTION: $e');
+      if (mounted) _showSnack('Error: $e');
     } finally {
       if (mounted) setState(() => _isSubmitting = false);
     }
@@ -142,8 +144,11 @@ class _OnboardingScreenState extends State<OnboardingScreen> {
                 shape: BoxShape.circle,
               ),
             ),
-          ).animate().scale(duration: 2.seconds, curve: Curves.easeInOut).fadeIn(),
-          
+          )
+              .animate()
+              .scale(duration: 2.seconds, curve: Curves.easeInOut)
+              .fadeIn(),
+
           // Confetti
           Align(
             alignment: Alignment.topCenter,
@@ -167,7 +172,7 @@ class _OnboardingScreenState extends State<OnboardingScreen> {
                 // Progress dots
                 SmoothPageIndicator(
                   controller: _pageController,
-                  count: 4, 
+                  count: 4,
                   effect: ExpandingDotsEffect(
                     activeDotColor: MaaColors.deepPink,
                     dotColor: MaaColors.pink.withAlpha(100),
@@ -197,8 +202,7 @@ class _OnboardingScreenState extends State<OnboardingScreen> {
                       ),
                       _LonelinessStep(
                         selected: _lonelinessAnswer,
-                        onSelect: (v) =>
-                            setState(() => _lonelinessAnswer = v),
+                        onSelect: (v) => setState(() => _lonelinessAnswer = v),
                       ),
                     ],
                   ),
@@ -211,9 +215,10 @@ class _OnboardingScreenState extends State<OnboardingScreen> {
                     label: _currentPage == 3 ? 'Let\'s Begin 🌸' : 'Next 💕',
                     isLoading: _isSubmitting,
                     onPressed: _nextPage,
-                  )
-                      .animate(target: _currentPage == 3 ? 1 : 0)
-                      .scale(begin: const Offset(1, 1), end: const Offset(1.05, 1.05), curve: Curves.elasticOut),
+                  ).animate(target: _currentPage == 3 ? 1 : 0).scale(
+                      begin: const Offset(1, 1),
+                      end: const Offset(1.05, 1.05),
+                      curve: Curves.elasticOut),
                 ),
               ],
             ),
@@ -236,7 +241,21 @@ class _NameStep extends StatelessWidget {
       child: Column(
         mainAxisAlignment: MainAxisAlignment.center,
         children: [
-          const Text('🤱', style: TextStyle(fontSize: 80))
+          Container(
+            padding: const EdgeInsets.all(12),
+            decoration: const BoxDecoration(
+              color: Colors.white,
+              shape: BoxShape.circle,
+            ),
+            child: ClipOval(
+              child: Image.asset(
+                'assets/images/logo.png',
+                width: 76,
+                height: 76,
+                fit: BoxFit.contain,
+              ),
+            ),
+          )
               .animate(onPlay: (c) => c.repeat())
               .shake(hz: 2, duration: 2.seconds),
           const SizedBox(height: 24),
@@ -258,8 +277,8 @@ class _NameStep extends StatelessWidget {
             controller: controller,
             decoration: const InputDecoration(
               hintText: 'Your name or nickname 💕',
-              prefixIcon: Icon(Icons.person_outline_rounded,
-                  color: MaaColors.deepPink),
+              prefixIcon:
+                  Icon(Icons.person_outline_rounded, color: MaaColors.deepPink),
             ),
             textCapitalization: TextCapitalization.words,
             style: const TextStyle(fontSize: 16),
@@ -284,7 +303,11 @@ class _BabyNameHeroStep extends StatelessWidget {
         children: [
           const Text('👶', style: TextStyle(fontSize: 80))
               .animate(onPlay: (c) => c.repeat())
-              .scale(begin: const Offset(1, 1), end: const Offset(1.2, 1.2), duration: 1.seconds, curve: Curves.easeInOut),
+              .scale(
+                  begin: const Offset(1, 1),
+                  end: const Offset(1.2, 1.2),
+                  duration: 1.seconds,
+                  curve: Curves.easeInOut),
           const SizedBox(height: 24),
           Text(
             'Thinking of names?',
@@ -304,8 +327,8 @@ class _BabyNameHeroStep extends StatelessWidget {
             controller: controller,
             decoration: const InputDecoration(
               hintText: 'Maybe some cute ideas? 🌸',
-              prefixIcon: Icon(Icons.favorite_outline_rounded,
-                  color: MaaColors.pink),
+              prefixIcon:
+                  Icon(Icons.favorite_outline_rounded, color: MaaColors.pink),
             ),
             textCapitalization: TextCapitalization.words,
             style: const TextStyle(fontSize: 16),
@@ -329,9 +352,11 @@ class _DueDateStep extends StatelessWidget {
       child: Column(
         mainAxisAlignment: MainAxisAlignment.center,
         children: [
-          const Text('🗓️', style: TextStyle(fontSize: 80))
-              .animate()
-              .rotate(begin: -0.1, end: 0.1, duration: 1.seconds, curve: Curves.easeInOut),
+          const Text('🗓️', style: TextStyle(fontSize: 80)).animate().rotate(
+              begin: -0.1,
+              end: 0.1,
+              duration: 1.seconds,
+              curve: Curves.easeInOut),
           const SizedBox(height: 24),
           Text(
             'When is baby arriving?',
@@ -350,8 +375,7 @@ class _DueDateStep extends StatelessWidget {
           GestureDetector(
             onTap: onPick,
             child: Container(
-              padding: const EdgeInsets.symmetric(
-                  horizontal: 24, vertical: 18),
+              padding: const EdgeInsets.symmetric(horizontal: 24, vertical: 18),
               decoration: BoxDecoration(
                 color: MaaColors.white,
                 borderRadius: BorderRadius.circular(16),
@@ -373,7 +397,8 @@ class _DueDateStep extends StatelessWidget {
                         : 'Tap to pick your due date',
                     style: TextStyle(
                       fontSize: 16,
-                      fontWeight: dueDate != null ? FontWeight.w600 : FontWeight.w400,
+                      fontWeight:
+                          dueDate != null ? FontWeight.w600 : FontWeight.w400,
                       color: dueDate != null
                           ? MaaColors.textDark
                           : MaaColors.textGrey,
@@ -386,8 +411,7 @@ class _DueDateStep extends StatelessWidget {
           if (dueDate != null) ...[
             const SizedBox(height: 16),
             Container(
-              padding:
-                  const EdgeInsets.symmetric(horizontal: 20, vertical: 12),
+              padding: const EdgeInsets.symmetric(horizontal: 20, vertical: 12),
               decoration: BoxDecoration(
                 gradient: MaaColors.cardGradient,
                 borderRadius: BorderRadius.circular(12),
@@ -397,8 +421,7 @@ class _DueDateStep extends StatelessWidget {
                 '${dueDate!.difference(DateTime.now()).inDays} days!\n'
                 'You\'re doing amazing! 💕',
                 textAlign: TextAlign.center,
-                style: const TextStyle(
-                    fontSize: 14, color: MaaColors.textDark),
+                style: const TextStyle(fontSize: 14, color: MaaColors.textDark),
               ),
             ).animate().fadeIn().scale(curve: Curves.easeOutBack),
           ],
@@ -429,7 +452,11 @@ class _LonelinessStep extends StatelessWidget {
         children: [
           const Text('💜', style: TextStyle(fontSize: 80))
               .animate(onPlay: (c) => c.repeat())
-              .scale(begin: const Offset(1, 1), end: const Offset(0.9, 0.9), duration: 1.seconds, curve: Curves.easeInOut),
+              .scale(
+                  begin: const Offset(1, 1),
+                  end: const Offset(0.9, 0.9),
+                  duration: 1.seconds,
+                  curve: Curves.easeInOut),
           const SizedBox(height: 24),
           Text(
             'How are you feeling?',
@@ -454,32 +481,38 @@ class _LonelinessStep extends StatelessWidget {
               child: AnimatedContainer(
                 duration: const Duration(milliseconds: 300),
                 margin: const EdgeInsets.only(bottom: 12),
-                padding: const EdgeInsets.symmetric(
-                    horizontal: 20, vertical: 16),
+                padding:
+                    const EdgeInsets.symmetric(horizontal: 20, vertical: 16),
                 decoration: BoxDecoration(
-                  color: isSelected ? MaaColors.pink.withAlpha(50) : MaaColors.white,
+                  color: isSelected
+                      ? MaaColors.pink.withAlpha(50)
+                      : MaaColors.white,
                   borderRadius: BorderRadius.circular(20),
                   border: Border.all(
-                    color:
-                        isSelected ? MaaColors.deepPink : MaaColors.pink.withAlpha(80),
+                    color: isSelected
+                        ? MaaColors.deepPink
+                        : MaaColors.pink.withAlpha(80),
                     width: isSelected ? 2.5 : 1,
                   ),
-                  boxShadow: isSelected ? [
-                    BoxShadow(color: MaaColors.deepPink.withAlpha(40), blurRadius: 10, spreadRadius: 2)
-                  ] : [],
+                  boxShadow: isSelected
+                      ? [
+                          BoxShadow(
+                              color: MaaColors.deepPink.withAlpha(40),
+                              blurRadius: 10,
+                              spreadRadius: 2)
+                        ]
+                      : [],
                 ),
                 child: Row(
                   children: [
-                    Text(opt['emoji']!,
-                        style: const TextStyle(fontSize: 24)),
+                    Text(opt['emoji']!, style: const TextStyle(fontSize: 24)),
                     const SizedBox(width: 16),
                     Text(
                       opt['text']!,
                       style: TextStyle(
                         fontSize: 15,
-                        fontWeight: isSelected
-                            ? FontWeight.w700
-                            : FontWeight.w400,
+                        fontWeight:
+                            isSelected ? FontWeight.w700 : FontWeight.w400,
                         color: isSelected
                             ? MaaColors.deepPink
                             : MaaColors.textDark,
@@ -488,7 +521,10 @@ class _LonelinessStep extends StatelessWidget {
                   ],
                 ),
               ),
-            ).animate().fadeIn(delay: (400 + idx * 100).ms).moveX(begin: -20, end: 0);
+            )
+                .animate()
+                .fadeIn(delay: (400 + idx * 100).ms)
+                .moveX(begin: -20, end: 0);
           }),
         ],
       ),

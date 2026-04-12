@@ -8,16 +8,18 @@ import 'package:flutter_animate/flutter_animate.dart';
 import 'package:share_plus/share_plus.dart';
 import '../../app_theme.dart';
 import '../../constants.dart';
+import '../../data/pregnancy_data.dart';
 import '../../models/user_model.dart';
 import '../../providers/user_provider.dart';
-import '../../widgets/maa_button.dart';
+import '../../widgets/loading_overlay.dart';
+import '../../utils/error_helper.dart';
+import 'weekly_detail_screen.dart';
 
 class PregnancyTrackerScreen extends StatefulWidget {
   const PregnancyTrackerScreen({super.key});
 
   @override
-  State<PregnancyTrackerScreen> createState() =>
-      _PregnancyTrackerScreenState();
+  State<PregnancyTrackerScreen> createState() => _PregnancyTrackerScreenState();
 }
 
 class _PregnancyTrackerScreenState extends State<PregnancyTrackerScreen> {
@@ -30,13 +32,21 @@ class _PregnancyTrackerScreenState extends State<PregnancyTrackerScreen> {
     '📖 Read a chapter / journaling': false,
   };
 
+  Future<void> _fetchData() async {
+    final provider = context.read<UserProvider>();
+    await provider.loadUser();
+    if (provider.error != null && mounted) {
+      ErrorHelper.showError(context, provider.error!);
+    }
+  }
+
   @override
   Widget build(BuildContext context) {
     return Scaffold(
       appBar: AppBar(title: const Text('Pregnancy Tracker 🤰')),
       body: PopScope(
         canPop: true,
-        onPopInvoked: (didPop) {
+        onPopInvokedWithResult: (didPop, result) {
           final provider = context.read<UserProvider>();
           if (provider.user?.points != null && provider.user!.points < 100) {
             debugPrint('Mama, keep tracking to earn your first badge! 🌸');
@@ -48,31 +58,62 @@ class _PregnancyTrackerScreenState extends State<PregnancyTrackerScreen> {
             final week = user?.pregnancyWeek ?? 0;
             final fruitData = getBabyFruitForWeek(week);
             final milestones = _getMilestones(week);
-
-            return SingleChildScrollView(
-              padding: const EdgeInsets.all(20),
-              child: Column(
-                crossAxisAlignment: CrossAxisAlignment.start,
-                children: [
-                  // Baby card
-                  _buildBabyCard(week, fruitData),
-                  const SizedBox(height: 20),
-                  // Trimester info
-                  _buildTrimesterInfo(week),
-                  const SizedBox(height: 20),
-                  // Daily tasks
-                  _buildDailyTasks(provider),
-                  const SizedBox(height: 20),
-                  // Milestones
-                  _buildMilestones(milestones, week),
-                  const SizedBox(height: 20),
-                  // Development facts
-                  _buildDevFacts(week),
-                  const SizedBox(height: 16),
-                  _buildTrackerSocialProof(),
-                  const SizedBox(height: 80),
-                ],
-              ),
+            return LoadingOverlay(
+              isLoading: provider.isLoading,
+              child: provider.error != null &&
+                      user == null &&
+                      !provider.isLoading
+                  ? Center(
+                      child: Column(
+                        mainAxisAlignment: MainAxisAlignment.center,
+                        children: [
+                          const Icon(Icons.wifi_off_rounded,
+                              size: 48, color: MaaColors.textMuted),
+                          const SizedBox(height: 16),
+                          const Text('Could not load your tracker data.',
+                              style: TextStyle(color: MaaColors.textSecondary)),
+                          const SizedBox(height: 16),
+                          ElevatedButton(
+                            onPressed: _fetchData,
+                            style: ElevatedButton.styleFrom(
+                                backgroundColor: MaaColors.pink,
+                                foregroundColor: MaaColors.white),
+                            child: const Text('Retry'),
+                          ),
+                        ],
+                      ),
+                    )
+                  : RefreshIndicator(
+                      onRefresh: _fetchData,
+                      color: MaaColors.pink,
+                      backgroundColor: MaaColors.cardDark,
+                      child: SingleChildScrollView(
+                        padding: const EdgeInsets.all(20),
+                        physics: const AlwaysScrollableScrollPhysics(),
+                        child: Column(
+                          crossAxisAlignment: CrossAxisAlignment.start,
+                          children: [
+                            // Baby card
+                            _buildBabyCard(week, fruitData),
+                            const SizedBox(height: 20),
+                            // Trimester info
+                            _buildTrimesterInfo(week),
+                            const SizedBox(height: 20),
+                            // Daily tasks
+                            _buildDailyTasks(provider),
+                            const SizedBox(height: 20),
+                            // Milestones
+                            _buildMilestones(milestones, week),
+                            const SizedBox(height: 20),
+                            // All Weeks Journey
+                            _buildWeeklyJourney(week),
+                            const SizedBox(height: 16),
+                            _buildTrackerSocialProof(),
+                            const SizedBox(height: 80),
+                          ],
+                        ),
+                      ),
+                    ),
             );
           },
         ),
@@ -88,16 +129,40 @@ class _PregnancyTrackerScreenState extends State<PregnancyTrackerScreen> {
         gradient: MaaColors.primaryGradient,
         borderRadius: BorderRadius.circular(24),
         boxShadow: [
-          BoxShadow(color: MaaColors.deepPink.withAlpha(60), blurRadius: 20, offset: const Offset(0, 10))
+          BoxShadow(
+              color: MaaColors.deepPink.withAlpha(60),
+              blurRadius: 20,
+              offset: const Offset(0, 10))
         ],
       ),
       child: Column(
         children: [
-          Text(
-            fruitData['emoji'] ?? '👶',
-            style: const TextStyle(fontSize: 80),
-          ).animate(onPlay: (c) => c.repeat()).shake(hz: 1, duration: 2.seconds),
-          const SizedBox(height: 12),
+          Container(
+            decoration: BoxDecoration(shape: BoxShape.circle, boxShadow: [
+              BoxShadow(
+                  color: MaaColors.pink.withAlpha(50),
+                  blurRadius: 20,
+                  spreadRadius: 5)
+            ]),
+            child: ClipRRect(
+              borderRadius: BorderRadius.circular(70),
+              child: Image.asset(
+                'assets/images/weeks/week_$week.jpg',
+                width: 140,
+                height: 140,
+                fit: BoxFit.cover,
+                errorBuilder: (context, error, stackTrace) => Text(
+                  fruitData['emoji'] ?? '👶',
+                  style: const TextStyle(fontSize: 80),
+                )
+                    .animate(onPlay: (c) => c.repeat())
+                    .shake(hz: 1, duration: 2.seconds),
+              ),
+            ),
+          )
+              .animate()
+              .scale(delay: 200.ms, duration: 500.ms, curve: Curves.elasticOut),
+          const SizedBox(height: 16),
           Text(
             'Week $week – ${fruitData['fruit']}',
             style: const TextStyle(
@@ -109,7 +174,9 @@ class _PregnancyTrackerScreenState extends State<PregnancyTrackerScreen> {
           Text(
             'About ${fruitData['size']} long 💕',
             style: TextStyle(
-                color: MaaColors.white.withAlpha(220), fontSize: 16, fontWeight: FontWeight.w600),
+                color: MaaColors.white.withAlpha(220),
+                fontSize: 16,
+                fontWeight: FontWeight.w600),
           ).animate().fadeIn(delay: 200.ms),
           const SizedBox(height: 20),
           ClipRRect(
@@ -125,7 +192,9 @@ class _PregnancyTrackerScreenState extends State<PregnancyTrackerScreen> {
           Text(
             'Week $week of 40 – ${((week / 40) * 100).toStringAsFixed(0)}% complete!',
             style: TextStyle(
-                color: MaaColors.white.withAlpha(200), fontSize: 13, fontWeight: FontWeight.w500),
+                color: MaaColors.white.withAlpha(200),
+                fontSize: 13,
+                fontWeight: FontWeight.w500),
           ),
         ],
       ),
@@ -197,8 +266,7 @@ class _PregnancyTrackerScreenState extends State<PregnancyTrackerScreen> {
             Text(
               '$completedCount/${_tasks.length}',
               style: const TextStyle(
-                  color: MaaColors.deepPink,
-                  fontWeight: FontWeight.w700),
+                  color: MaaColors.deepPink, fontWeight: FontWeight.w700),
             ),
           ],
         ),
@@ -225,10 +293,8 @@ class _PregnancyTrackerScreenState extends State<PregnancyTrackerScreen> {
               if (val == true) {
                 await provider.addPoints(AppConstants.pointsPerTask);
                 if (mounted) {
-                  ScaffoldMessenger.of(context).showSnackBar(SnackBar(
-                    content: Text(
-                        '✅ Task done! +${AppConstants.pointsPerTask} MaaPoints 🌟'),
-                  ));
+                  ErrorHelper.showSuccess(context,
+                      '✅ Task done! +${AppConstants.pointsPerTask} MaaPoints 🌟');
                 }
               }
             },
@@ -242,8 +308,7 @@ class _PregnancyTrackerScreenState extends State<PregnancyTrackerScreen> {
     return Column(
       crossAxisAlignment: CrossAxisAlignment.start,
       children: [
-        Text('Milestones 🏆',
-            style: Theme.of(context).textTheme.titleLarge),
+        Text('Milestones 🏆', style: Theme.of(context).textTheme.titleLarge),
         const SizedBox(height: 12),
         ...milestones.asMap().entries.map((entry) {
           final idx = entry.key;
@@ -253,9 +318,8 @@ class _PregnancyTrackerScreenState extends State<PregnancyTrackerScreen> {
             margin: const EdgeInsets.only(bottom: 12),
             padding: const EdgeInsets.all(16),
             decoration: BoxDecoration(
-              color: reached
-                  ? MaaColors.success.withAlpha(20)
-                  : MaaColors.white,
+              color:
+                  reached ? MaaColors.success.withAlpha(20) : MaaColors.white,
               borderRadius: BorderRadius.circular(20),
               border: Border.all(
                 color: reached
@@ -264,13 +328,15 @@ class _PregnancyTrackerScreenState extends State<PregnancyTrackerScreen> {
                 width: reached ? 2 : 1,
               ),
               boxShadow: [
-                BoxShadow(color: MaaColors.cardShadow, blurRadius: 10, offset: const Offset(0, 4))
+                BoxShadow(
+                    color: MaaColors.cardShadow,
+                    blurRadius: 10,
+                    offset: const Offset(0, 4))
               ],
             ),
             child: Row(
               children: [
-                Text(reached ? '✅' : '⭕',
-                    style: const TextStyle(fontSize: 22)),
+                Text(reached ? '✅' : '⭕', style: const TextStyle(fontSize: 22)),
                 const SizedBox(width: 12),
                 Expanded(
                   child: Column(
@@ -281,9 +347,8 @@ class _PregnancyTrackerScreenState extends State<PregnancyTrackerScreen> {
                         style: TextStyle(
                           fontSize: 15,
                           fontWeight: FontWeight.w700,
-                          color: reached
-                              ? MaaColors.success
-                              : MaaColors.textDark,
+                          color:
+                              reached ? MaaColors.success : MaaColors.textDark,
                         ),
                       ),
                       Text(
@@ -296,11 +361,14 @@ class _PregnancyTrackerScreenState extends State<PregnancyTrackerScreen> {
                 ),
                 if (reached)
                   IconButton(
-                    icon: const Icon(Icons.share_rounded, color: MaaColors.deepPink, size: 20),
+                    icon: const Icon(Icons.share_rounded,
+                        color: MaaColors.deepPink, size: 20),
                     onPressed: () {
-                      Share.share(
-                        'I reached a new milestone on MaaCare! 🏆 "${m['title']}" at Week ${m['week']}! ${m['emoji']}\n\nYou are never alone, Mama! 💕',
-                        subject: 'MaaCare Milestone! 🎉',
+                      SharePlus.instance.share(
+                        ShareParams(
+                          text: 'I reached a new milestone on MaaCare! 🏆 "${m['title']}" at Week ${m['week']}! ${m['emoji']}\n\nYou are never alone, Mama! 💕',
+                          subject: 'MaaCare Milestone! 🎉',
+                        ),
                       );
                     },
                     tooltip: 'Share milestone!',
@@ -315,39 +383,110 @@ class _PregnancyTrackerScreenState extends State<PregnancyTrackerScreen> {
     );
   }
 
-  Widget _buildDevFacts(int week) {
-    final facts = _getWeekFacts(week);
-    return Container(
-      padding: const EdgeInsets.all(16),
-      decoration: BoxDecoration(
-        color: MaaColors.softPurple.withAlpha(80),
-        borderRadius: BorderRadius.circular(16),
-      ),
-      child: Column(
-        crossAxisAlignment: CrossAxisAlignment.start,
-        children: [
-          const Text('👶 Baby\'s Development',
-              style: TextStyle(
-                  fontSize: 16,
-                  fontWeight: FontWeight.w600,
-                  color: MaaColors.textDark)),
-          const SizedBox(height: 10),
-          ...facts.map((fact) => Padding(
-                padding: const EdgeInsets.only(bottom: 6),
+  Widget _buildWeeklyJourney(int currentWeek) {
+    return Column(
+      crossAxisAlignment: CrossAxisAlignment.start,
+      children: [
+        Text('The 40-Week Journey 📅',
+            style: Theme.of(context)
+                .textTheme
+                .titleLarge
+                ?.copyWith(fontWeight: FontWeight.w700)),
+        const SizedBox(height: 16),
+        ...weeklyPregnancyData.keys.map((weekNum) {
+          final info = weeklyPregnancyData[weekNum]!;
+          final isCurrent = weekNum == currentWeek;
+
+          return Container(
+            margin: const EdgeInsets.only(bottom: 12),
+            decoration: BoxDecoration(
+              color: isCurrent
+                  ? MaaColors.softPurple.withAlpha(60)
+                  : MaaColors.white,
+              borderRadius: BorderRadius.circular(16),
+              border: Border.all(
+                color: isCurrent
+                    ? MaaColors.pink.withAlpha(100)
+                    : MaaColors.pink.withAlpha(30),
+                width: isCurrent ? 2 : 1,
+              ),
+              boxShadow: [
+                BoxShadow(
+                    color: MaaColors.cardShadow,
+                    blurRadius: 10,
+                    offset: const Offset(0, 4))
+              ],
+            ),
+            child: InkWell(
+              onTap: () {
+                Navigator.push(
+                  context,
+                  MaterialPageRoute(
+                    builder: (context) => WeeklyDetailScreen(week: weekNum),
+                  ),
+                );
+              },
+              borderRadius: BorderRadius.circular(16),
+              child: Padding(
+                padding:
+                    const EdgeInsets.symmetric(horizontal: 16, vertical: 20),
                 child: Row(
-                  crossAxisAlignment: CrossAxisAlignment.start,
                   children: [
-                    const Text('🌸 ',
-                        style: TextStyle(fontSize: 14)),
+                    ClipRRect(
+                      borderRadius: BorderRadius.circular(12),
+                      child: Image.asset(
+                        'assets/images/weeks/week_$weekNum.jpg',
+                        width: 60,
+                        height: 60,
+                        fit: BoxFit.cover,
+                        errorBuilder: (context, error, stackTrace) => Container(
+                          width: 60,
+                          height: 60,
+                          color: MaaColors.pink.withAlpha(20),
+                          child: const Center(
+                              child: Icon(Icons.child_care_rounded,
+                                  color: MaaColors.pink)),
+                        ),
+                      ),
+                    ),
+                    const SizedBox(width: 16),
                     Expanded(
-                        child: Text(fact,
+                      child: Column(
+                        crossAxisAlignment: CrossAxisAlignment.start,
+                        children: [
+                          Text(
+                            'Week $weekNum: ${info['title']}',
+                            style: TextStyle(
+                              fontSize: 16,
+                              fontWeight: FontWeight.w700,
+                              color: isCurrent
+                                  ? MaaColors.deepPink
+                                  : MaaColors.textDark,
+                            ),
+                          ),
+                          const SizedBox(height: 4),
+                          Text(
+                            info['size'] ?? '',
                             style: const TextStyle(
-                                fontSize: 13, color: MaaColors.textGrey))),
+                                fontSize: 13, color: MaaColors.textGrey),
+                          ),
+                        ],
+                      ),
+                    ),
+                    Icon(
+                      Icons.arrow_forward_ios_rounded,
+                      size: 16,
+                      color: isCurrent
+                          ? MaaColors.deepPink
+                          : MaaColors.textGrey.withAlpha(150),
+                    ),
                   ],
                 ),
-              )),
-        ],
-      ),
+              ),
+            ),
+          );
+        }),
+      ],
     );
   }
 
@@ -361,11 +500,14 @@ class _PregnancyTrackerScreenState extends State<PregnancyTrackerScreen> {
       child: const Row(
         children: [
           Text('🦋', style: TextStyle(fontSize: 24)),
-          const SizedBox(width: 12),
+          SizedBox(width: 12),
           Expanded(
             child: Text(
               '842 other Mamas in your week are tracking their milestones today! You\'re doing great! ✨',
-              style: TextStyle(fontSize: 12, fontWeight: FontWeight.w600, color: MaaColors.textDark),
+              style: TextStyle(
+                  fontSize: 12,
+                  fontWeight: FontWeight.w600,
+                  color: MaaColors.textDark),
             ),
           ),
         ],
@@ -384,39 +526,5 @@ class _PregnancyTrackerScreenState extends State<PregnancyTrackerScreen> {
       {'week': 36, 'title': 'Baby is full-term soon', 'emoji': '🏠'},
       {'week': 40, 'title': 'Due date! Hello baby!', 'emoji': '🎊'},
     ];
-  }
-
-  List<String> _getWeekFacts(int week) {
-    if (week < 8) {
-      return [
-        'Neural tube (brain and spine) is forming',
-        'Heart begins to beat',
-        'Basic facial features developing',
-      ];
-    } else if (week < 16) {
-      return [
-        'Fingers and toes are forming',
-        'Baby can make facial expressions',
-        'Digestive system developing',
-      ];
-    } else if (week < 24) {
-      return [
-        'Baby can hear your voice!',
-        'Eyebrows and lashes forming',
-        'Baby practices breathing movements',
-      ];
-    } else if (week < 32) {
-      return [
-        'Baby opens and closes eyes',
-        'Bones are hardening',
-        'Baby responds to light and sound',
-      ];
-    } else {
-      return [
-        'Baby is gaining fat for warmth',
-        'Lungs are almost fully developed',
-        'Baby is in position for birth',
-      ];
-    }
   }
 }

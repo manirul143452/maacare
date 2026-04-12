@@ -5,23 +5,31 @@
 class UserModel {
   final String id;
   final String name;
+  final String? email;
+  final String? phone;
   final DateTime? dueDate;
   final String? mood;
   final int points;
   final int streak;
   final String? avatarUrl;
-  final String language; // 'en' or 'hi'
+  final String language;
+  final bool isPremium;
+  final String? premiumPlan;
   final DateTime createdAt;
 
   const UserModel({
     required this.id,
     required this.name,
+    this.email,
+    this.phone,
     this.dueDate,
     this.mood,
     this.points = 0,
     this.streak = 0,
     this.avatarUrl,
     this.language = 'en',
+    this.isPremium = false,
+    this.premiumPlan,
     required this.createdAt,
   });
 
@@ -44,22 +52,30 @@ class UserModel {
 
   UserModel copyWith({
     String? name,
+    String? email,
+    String? phone,
     DateTime? dueDate,
     String? mood,
     int? points,
     int? streak,
     String? avatarUrl,
     String? language,
+    bool? isPremium,
+    String? premiumPlan,
   }) {
     return UserModel(
       id: id,
       name: name ?? this.name,
+      email: email ?? this.email,
+      phone: phone ?? this.phone,
       dueDate: dueDate ?? this.dueDate,
       mood: mood ?? this.mood,
       points: points ?? this.points,
       streak: streak ?? this.streak,
       avatarUrl: avatarUrl ?? this.avatarUrl,
       language: language ?? this.language,
+      isPremium: isPremium ?? this.isPremium,
+      premiumPlan: premiumPlan ?? this.premiumPlan,
       createdAt: createdAt,
     );
   }
@@ -68,6 +84,8 @@ class UserModel {
     return UserModel(
       id: map['id'] as String,
       name: (map['name'] as String?) ?? 'Mama',
+      email: map['email'] as String?,
+      phone: map['phone'] as String?,
       dueDate: map['due_date'] != null
           ? DateTime.tryParse(map['due_date'] as String)
           : null,
@@ -76,6 +94,8 @@ class UserModel {
       streak: (map['streak'] as int?) ?? 0,
       avatarUrl: map['avatar_url'] as String?,
       language: (map['language'] as String?) ?? 'en',
+      isPremium: (map['is_premium'] as bool?) ?? false,
+      premiumPlan: map['premium_plan'] as String?,
       createdAt: DateTime.parse(
           (map['created_at'] as String?) ?? DateTime.now().toIso8601String()),
     );
@@ -85,12 +105,16 @@ class UserModel {
     return {
       'id': id,
       'name': name,
+      if (email != null) 'email': email,
+      if (phone != null) 'phone': phone,
       'due_date': dueDate?.toIso8601String().split('T').first,
       'mood': mood,
       'points': points,
       'streak': streak,
       'avatar_url': avatarUrl,
       'language': language,
+      'is_premium': isPremium,
+      if (premiumPlan != null) 'premium_plan': premiumPlan,
     };
   }
 }

@@ -50,7 +50,7 @@ class _SelfCareScreenState extends State<SelfCareScreen>
       ),
       body: PopScope(
         canPop: true,
-        onPopInvoked: (didPop) {
+        onPopInvokedWithResult: (didPop, result) {
           if (_journalController.text.isNotEmpty) {
             ScaffoldMessenger.of(context).showSnackBar(
               const SnackBar(content: Text('Your journal draft is saved, Mama! 📖')),
