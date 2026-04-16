@@ -51,13 +51,16 @@ class PostModel {
 
   Map<String, dynamic> toMap() {
     return {
+      'id': id,
       'user_id': userId,
       'content': content,
+      'likes': likes,
       'week_tag': weekTag,
       'anonymous': anonymous,
       'author_name': authorName,
       if (imageUrl != null) 'image_url': imageUrl,
       if (videoUrl != null) 'video_url': videoUrl,
+      'created_at': createdAt.toIso8601String(),
     };
   }
 }

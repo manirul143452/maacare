@@ -12,6 +12,9 @@ import 'package:google_fonts/google_fonts.dart';
 import '../../app_theme.dart';
 import '../../providers/user_provider.dart';
 import '../../providers/community_provider.dart';
+import '../../models/post_model.dart';
+import '../../services/insforge_service.dart';
+import '../community/parents_park_screen.dart';
 
 class ProfileScreen extends StatefulWidget {
   const ProfileScreen({super.key});
@@ -28,6 +31,8 @@ class _ProfileScreenState extends State<ProfileScreen>
   late ConfettiController _confettiController;
   late AnimationController _pulseController;
   late Animation<double> _pulseAnimation;
+  List<PostModel> _myPosts = [];
+  bool _loadingPosts = false;
 
   @override
   void initState() {
@@ -43,6 +48,7 @@ class _ProfileScreenState extends State<ProfileScreen>
     _pulseAnimation = Tween<double>(begin: 8, end: 15).animate(
       CurvedAnimation(parent: _pulseController, curve: Curves.easeInOut),
     );
+    WidgetsBinding.instance.addPostFrameCallback((_) => _loadMyPosts());
   }
 
   @override
@@ -51,6 +57,17 @@ class _ProfileScreenState extends State<ProfileScreen>
     _confettiController.dispose();
     _pulseController.dispose();
     super.dispose();
+  }
+
+  Future<void> _loadMyPosts() async {
+    final user = context.read<UserProvider>().user;
+    if (user == null) return;
+    setState(() => _loadingPosts = true);
+    try {
+      final posts = await InsForgeService.instance.fetchPostsByUser(user.id);
+      if (mounted) setState(() => _myPosts = posts);
+    } catch (_) {}
+    if (mounted) setState(() => _loadingPosts = false);
   }
 
   Future<void> _saveName() async {
@@ -174,7 +191,7 @@ class _ProfileScreenState extends State<ProfileScreen>
   @override
   Widget build(BuildContext context) {
     return Scaffold(
-      backgroundColor: MaaColors.background,
+      backgroundColor: Theme.of(context).scaffoldBackgroundColor,
       body: Stack(
         children: [
           // Particle background
@@ -217,6 +234,8 @@ class _ProfileScreenState extends State<ProfileScreen>
                     _buildInfoCard(user),
                     const SizedBox(height: 24),
                     _buildBadgesSection(user),
+                    const SizedBox(height: 24),
+                    _buildMyPostsSection(),
                     const SizedBox(height: 24),
                     _buildActionButtons(),
                     const SizedBox(height: 40),
@@ -848,6 +867,282 @@ class _ProfileScreenState extends State<ProfileScreen>
         .animate()
         .fadeIn(delay: (500 + index * 50).ms)
         .scale(begin: const Offset(0.9, 0.9), curve: Curves.easeOutBack);
+  }
+
+  Widget _buildMyPostsSection() {
+    return Container(
+      margin: const EdgeInsets.symmetric(horizontal: 20),
+      child: Column(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
+          Row(
+            mainAxisAlignment: MainAxisAlignment.spaceBetween,
+            children: [
+              Row(
+                children: [
+                  Container(
+                    padding: const EdgeInsets.all(10),
+                    decoration: BoxDecoration(
+                      gradient: MaaColors.primaryGradient,
+                      borderRadius: BorderRadius.circular(14),
+                      boxShadow: [
+                        BoxShadow(
+                          color: MaaColors.pink.withAlpha(60),
+                          blurRadius: 10,
+                        ),
+                      ],
+                    ),
+                    child: const Text('📝', style: TextStyle(fontSize: 20)),
+                  ),
+                  const SizedBox(width: 14),
+                  Text(
+                    'My Posts',
+                    style: GoogleFonts.poppins(
+                      fontSize: 18,
+                      fontWeight: FontWeight.w600,
+                      color: MaaColors.textPrimary,
+                    ),
+                  ),
+                ],
+              ),
+              if (_myPosts.isNotEmpty)
+                Container(
+                  padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 4),
+                  decoration: BoxDecoration(
+                    color: MaaColors.pink.withAlpha(20),
+                    borderRadius: BorderRadius.circular(12),
+                  ),
+                  child: Text(
+                    '${_myPosts.length} posts',
+                    style: GoogleFonts.poppins(
+                      fontSize: 11,
+                      fontWeight: FontWeight.w600,
+                      color: MaaColors.pink,
+                    ),
+                  ),
+                ),
+            ],
+          ),
+          const SizedBox(height: 16),
+          if (_loadingPosts)
+            const Center(
+              child: Padding(
+                padding: EdgeInsets.all(24),
+                child: CircularProgressIndicator(color: MaaColors.pink, strokeWidth: 2),
+              ),
+            )
+          else if (_myPosts.isEmpty)
+            Container(
+              padding: const EdgeInsets.all(24),
+              decoration: BoxDecoration(
+                color: MaaColors.cardDark,
+                borderRadius: BorderRadius.circular(20),
+                border: Border.all(color: MaaColors.glassBorder),
+              ),
+              child: Column(
+                children: [
+                  const Text('🌸', style: TextStyle(fontSize: 48)),
+                  const SizedBox(height: 12),
+                  Text(
+                    'No posts yet!',
+                    style: GoogleFonts.poppins(
+                      fontSize: 16,
+                      fontWeight: FontWeight.w600,
+                      color: MaaColors.textPrimary,
+                    ),
+                  ),
+                  const SizedBox(height: 6),
+                  Text(
+                    'Share your journey with the community 💕',
+                    style: GoogleFonts.poppins(
+                      fontSize: 12,
+                      color: MaaColors.textSecondary,
+                    ),
+                    textAlign: TextAlign.center,
+                  ),
+                ],
+              ),
+            )
+          else
+            ListView.separated(
+              shrinkWrap: true,
+              physics: const NeverScrollableScrollPhysics(),
+              itemCount: _myPosts.length,
+              separatorBuilder: (_, __) => const SizedBox(height: 12),
+              itemBuilder: (_, i) {
+                final post = _myPosts[i];
+                final diff = DateTime.now().difference(post.createdAt);
+                final timeAgo = diff.inMinutes < 60
+                    ? '${diff.inMinutes}m ago'
+                    : diff.inHours < 24
+                        ? '${diff.inHours}h ago'
+                        : '${diff.inDays}d ago';
+                return Container(
+                  padding: const EdgeInsets.all(16),
+                  decoration: BoxDecoration(
+                    color: MaaColors.cardDark,
+                    borderRadius: BorderRadius.circular(18),
+                    border: Border.all(color: MaaColors.glassBorder),
+                    boxShadow: [
+                      BoxShadow(
+                        color: MaaColors.darkShadow,
+                        blurRadius: 10,
+                        offset: const Offset(0, 3),
+                      ),
+                    ],
+                  ),
+                  child: Column(
+                    crossAxisAlignment: CrossAxisAlignment.start,
+                    children: [
+                      // Header Row
+                      Row(
+                        children: [
+                          Container(
+                            padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 3),
+                            decoration: BoxDecoration(
+                              color: post.anonymous
+                                  ? MaaColors.softPurple.withAlpha(30)
+                                  : MaaColors.pink.withAlpha(20),
+                              borderRadius: BorderRadius.circular(10),
+                            ),
+                            child: Text(
+                              post.anonymous ? '🎭 Anonymous' : '👤 Public',
+                              style: GoogleFonts.poppins(
+                                fontSize: 9,
+                                fontWeight: FontWeight.w600,
+                                color: post.anonymous
+                                    ? MaaColors.softPurple
+                                    : MaaColors.pink,
+                              ),
+                            ),
+                          ),
+                          if (post.weekTag > 0) ...[
+                            const SizedBox(width: 8),
+                            Container(
+                              padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 3),
+                              decoration: BoxDecoration(
+                                color: MaaColors.pink.withAlpha(15),
+                                borderRadius: BorderRadius.circular(10),
+                              ),
+                              child: Text(
+                                'Week ${post.weekTag}',
+                                style: GoogleFonts.poppins(
+                                  fontSize: 9,
+                                  color: MaaColors.pink,
+                                  fontWeight: FontWeight.w500,
+                                ),
+                              ),
+                            ),
+                          ],
+                          const Spacer(),
+                          Text(
+                            timeAgo,
+                            style: GoogleFonts.poppins(
+                              fontSize: 10,
+                              color: MaaColors.textMuted,
+                            ),
+                          ),
+                        ],
+                      ),
+                      const SizedBox(height: 10),
+                      // Content
+                      Text(
+                        post.content,
+                        style: GoogleFonts.poppins(
+                          fontSize: 13,
+                          color: MaaColors.textPrimary,
+                          height: 1.5,
+                        ),
+                        maxLines: 4,
+                        overflow: TextOverflow.ellipsis,
+                      ),
+                      // Media thumbnail
+                      if (post.imageUrl != null || post.videoUrl != null)
+                        Padding(
+                          padding: const EdgeInsets.only(top: 10),
+                          child: ClipRRect(
+                            borderRadius: BorderRadius.circular(12),
+                            child: post.videoUrl != null
+                                ? VideoPostPlayer(url: post.videoUrl!)
+                                : post.imageUrl!.startsWith('data:')
+                                    ? Image.memory(
+                                        Uri.parse(post.imageUrl!).data!.contentAsBytes(),
+                                        height: 150,
+                                        width: double.infinity,
+                                        fit: BoxFit.cover,
+                                        errorBuilder: (_, __, ___) => const SizedBox(),
+                                      )
+                                    : Image.network(
+                                        post.imageUrl!,
+                                        height: 150,
+                                        width: double.infinity,
+                                        fit: BoxFit.cover,
+                                        errorBuilder: (_, __, ___) => const SizedBox(),
+                                      ),
+                          ),
+                        ),
+                      const SizedBox(height: 10),
+                      // Stats Row
+                      Row(
+                        children: [
+                          const Text('❤️', style: TextStyle(fontSize: 14)),
+                          const SizedBox(width: 4),
+                          Text(
+                            '${post.likes} likes',
+                            style: GoogleFonts.poppins(
+                              fontSize: 12,
+                              color: MaaColors.pink,
+                              fontWeight: FontWeight.w500,
+                            ),
+                          ),
+                          const Spacer(),
+                          GestureDetector(
+                            onTap: () async {
+                              final ok = await InsForgeService.instance.deletePost(post.id);
+                              if (ok && mounted) {
+                                setState(() => _myPosts.removeWhere((p) => p.id == post.id));
+                                ScaffoldMessenger.of(context).showSnackBar(
+                                  SnackBar(
+                                    content: const Text('Post deleted 🗑️'),
+                                    backgroundColor: MaaColors.cardLight,
+                                    behavior: SnackBarBehavior.floating,
+                                    shape: RoundedRectangleBorder(
+                                        borderRadius: BorderRadius.circular(12)),
+                                  ),
+                                );
+                              }
+                            },
+                            child: Container(
+                              padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 4),
+                              decoration: BoxDecoration(
+                                color: MaaColors.error.withAlpha(20),
+                                borderRadius: BorderRadius.circular(10),
+                                border: Border.all(color: MaaColors.error.withAlpha(40)),
+                              ),
+                              child: Row(
+                                children: [
+                                  const Icon(Icons.delete_outline_rounded,
+                                      size: 13, color: MaaColors.error),
+                                  const SizedBox(width: 4),
+                                  Text('Delete',
+                                      style: GoogleFonts.poppins(
+                                          fontSize: 11,
+                                          color: MaaColors.error,
+                                          fontWeight: FontWeight.w500)),
+                                ],
+                              ),
+                            ),
+                          ),
+                        ],
+                      ),
+                    ],
+                  ),
+                ).animate().fadeIn(delay: (i * 80).ms).moveY(begin: 15, end: 0);
+              },
+            ),
+        ],
+      ),
+    ).animate().fadeIn(delay: 450.ms).moveY(begin: 20, end: 0);
   }
 
   Widget _buildActionButtons() {

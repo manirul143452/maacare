@@ -1,15 +1,11 @@
 // ignore_for_file: deprecated_member_use
-import 'dart:convert';
-import 'package:http/http.dart' as http;
 import 'package:flutter/material.dart';
 import 'package:provider/provider.dart';
-import 'package:shared_preferences/shared_preferences.dart';
 import 'package:flutter_animate/flutter_animate.dart';
 import 'package:google_fonts/google_fonts.dart';
 import 'dart:ui' show ImageFilter;
 import '../../app_theme.dart';
-import '../../constants.dart';
-import '../../services/insforge_service.dart';
+import '../../services/auth_service.dart';
 import '../../providers/user_provider.dart';
 import '../../utils/error_helper.dart';
 import '../../widgets/loading_overlay.dart';
@@ -43,63 +39,40 @@ class _AuthScreenState extends State<AuthScreen> {
     setState(() => _isLoading = true);
     
     try {
-      bool success = false;
-      String? errorMessage;
-
-      final url = Uri.parse('${AppConstants.insForgeUrl}/api/auth/${_isLogin ? 'sessions' : 'users'}');
+      AuthResult result;
       
-      final response = await http.post(
-        url,
-        headers: {
-          'Content-Type': 'application/json',
-          'Authorization': 'Bearer ${AppConstants.insForgeAnonKey}',
-        },
-        body: jsonEncode({
-          'email': _emailController.text.trim(),
-          'password': _passwordController.text.trim(),
-          if (!_isLogin && _nameController.text.trim().isNotEmpty) 'name': _nameController.text.trim(),
-        }),
-      );
-
-      if (response.statusCode == 200 || response.statusCode == 201) {
-        if (response.body.isNotEmpty) {
-          final data = jsonDecode(response.body);
-          if (data['accessToken'] == null || data['requireEmailVerification'] == true) {
-            errorMessage = 'email_verification_required';
-          } else {
-            // Save Token Manually
-            final prefs = await SharedPreferences.getInstance();
-            await prefs.setString('insforge_token', data['accessToken']);
-            await InsForgeService.instance.loadSession(); // reload singleton context
-            success = true;
-          }
-        } else {
-           // Body is empty, but status is 200/201. This occurs if email confirmation is required but no token is returned.
-           errorMessage = 'email_verification_required';
-        }
+      if (_isLogin) {
+        result = await AuthService.instance.signIn(
+          email: _emailController.text.trim(),
+          password: _passwordController.text.trim(),
+        );
       } else {
-        errorMessage = 'HTTP ${response.statusCode}: ${response.body}';
+        result = await AuthService.instance.signUp(
+          email: _emailController.text.trim(),
+          password: _passwordController.text.trim(),
+          name: _nameController.text.trim().isNotEmpty ? _nameController.text.trim() : null,
+        );
       }
 
       if (!mounted) return;
 
-      if (success) {
+      if (result.success) {
+        // Load user data
         await context.read<UserProvider>().loadUser();
         if (!mounted) return;
         
-        final user = context.read<UserProvider>().user;
-        if (user == null) {
-          Navigator.pushReplacementNamed(context, '/onboarding');
-        } else {
+        if (_isLogin) {
+          // Login: go directly to home (skip onboarding)
           Navigator.pushReplacementNamed(context, '/home');
-        }
-      } else {
-        if (!_isLogin && errorMessage == 'email_verification_required') {
-          ErrorHelper.showSuccess(context, 'Verification sent! Please check your email.');
-          _toggleMode();
         } else {
-          ErrorHelper.showError(context, errorMessage ?? 'Authentication failed');
+          // Signup: go to onboarding for new users
+          Navigator.pushReplacementNamed(context, '/onboarding');
         }
+      } else if (result.emailVerificationRequired) {
+        ErrorHelper.showSuccess(context, 'Verification sent! Please check your email.');
+        _toggleMode();
+      } else {
+        ErrorHelper.showError(context, result.error ?? 'Authentication failed');
       }
     } catch (e) {
       if (mounted) {

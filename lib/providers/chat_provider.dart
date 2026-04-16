@@ -96,12 +96,24 @@ class ChatProvider extends ChangeNotifier {
       if (conversationId != null) {
         InsForgeRealtimeClient.instance.subscribe('chats:$conversationId',
             (payload) {
-          // Check if payload is from chat trigger
-          if (payload['event'] == 'INSERT_chat') {
+          final event = payload['event'];
+          if (event == 'INSERT_chat') {
             final newMsg = ChatMessage.fromMap(payload['record']);
-            // Check if not already explicitly added by local sendMessage
             if (!_messages.any((m) => m.id == newMsg.id)) {
               _messages.add(newMsg);
+              notifyListeners();
+            }
+          } else if (event == 'UPDATE_chat') {
+            final updatedMsg = ChatMessage.fromMap(payload['record']);
+            final index = _messages.indexWhere((m) => m.id == updatedMsg.id);
+            if (index != -1) {
+              _messages[index] = updatedMsg;
+              notifyListeners();
+            }
+          } else if (event == 'DELETE_chat') {
+            final deletedId = payload['old_record']?['id'] ?? payload['record']?['id'];
+            if (deletedId != null) {
+              _messages.removeWhere((m) => m.id == deletedId);
               notifyListeners();
             }
           }

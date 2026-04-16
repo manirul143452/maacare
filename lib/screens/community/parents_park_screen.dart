@@ -22,6 +22,8 @@ import '../../constants.dart';
 import '../../services/insforge_service.dart';
 import '../../widgets/loading_overlay.dart';
 import '../../utils/error_helper.dart';
+import '../../l10n/app_localizations.dart';
+import 'package:url_launcher/url_launcher.dart';
 
 class ParentsParkScreen extends StatefulWidget {
   const ParentsParkScreen({super.key});
@@ -84,8 +86,19 @@ class _ParentsParkScreenState extends State<ParentsParkScreen>
 
   String _moderateContent(String content) {
     final negativeWords = [
-      'hate', 'kill', 'die', 'stupid', 'ugly', 'worst', 'terrible',
-      'disgusting', 'horrible', 'pathetic', 'loser', 'dumb', 'useless',
+      'hate',
+      'kill',
+      'die',
+      'stupid',
+      'ugly',
+      'worst',
+      'terrible',
+      'disgusting',
+      'horrible',
+      'pathetic',
+      'loser',
+      'dumb',
+      'useless',
     ];
     final lower = content.toLowerCase();
     for (final word in negativeWords) {
@@ -115,12 +128,12 @@ class _ParentsParkScreenState extends State<ParentsParkScreen>
       videoUrl: videoUrl,
     );
 
-    final success =
-        await context.read<CommunityProvider>().createPost(post);
+    final success = await context.read<CommunityProvider>().createPost(post);
     if (success && mounted) {
       _confetti.play();
       context.read<UserProvider>().addPoints(AppConstants.pointsPerPost);
-      ErrorHelper.showSuccess(context, 'Post shared! 🌸 +10 MaaPoints! Stay positive!');
+      ErrorHelper.showSuccess(
+          context, 'Post shared! 🌸 +10 MaaPoints! Stay positive!');
     } else if (mounted) {
       ErrorHelper.showError(context, 'Could not share post. Please try again.');
     }
@@ -129,148 +142,160 @@ class _ParentsParkScreenState extends State<ParentsParkScreen>
   @override
   Widget build(BuildContext context) {
     return Scaffold(
-      backgroundColor: MaaColors.background,
+      backgroundColor: Theme.of(context).scaffoldBackgroundColor,
       appBar: _buildAppBar(),
       body: Consumer<CommunityProvider>(
         builder: (ctx, provider, _) => LoadingOverlay(
           isLoading: provider.isLoading,
           child: Stack(
             children: [
-          // Particle background
-          ...List.generate(15, (index) {
-            final random = index * 37 % 100;
-            final size = 1.5 + (index % 3);
-            return Positioned(
-              left: (random * 3.6) % MediaQuery.of(context).size.width,
-              top: (random * 5.2) % MediaQuery.of(context).size.height,
-              child: Container(
-                width: size,
-                height: size,
-                decoration: BoxDecoration(
-                  shape: BoxShape.circle,
-                  color: index % 3 == 0
-                      ? MaaColors.pink.withAlpha(25)
-                      : index % 3 == 1
-                          ? MaaColors.gold.withAlpha(20)
-                          : MaaColors.softPurple.withAlpha(25),
-                ),
-              ),
-            ).animate(onPlay: (c) => c.repeat()).moveY(
-                  begin: 0,
-                  end: -20,
-                  duration: Duration(seconds: 3 + (index % 4)),
-                  curve: Curves.easeInOut,
-                );
-          }),
-          Column(
-            children: [
-              _buildSocialProofHeader(),
-              _buildSuggestedConnections(),
-              Expanded(
-                child: Builder(
-                  builder: (ctx) {
-                    if (!provider.isLoading && provider.error != null && provider.posts.isEmpty) {
-                      return Center(
-                        child: Container(
-                          margin: const EdgeInsets.all(24),
-                          padding: const EdgeInsets.all(24),
-                          decoration: BoxDecoration(
-                            color: MaaColors.cardDark,
-                            borderRadius: BorderRadius.circular(20),
-                            border: Border.all(color: MaaColors.glassBorder),
-                          ),
-                          child: Column(
-                            mainAxisSize: MainAxisSize.min,
-                            children: [
-                              const Text('😔', style: TextStyle(fontSize: 48)),
-                              const SizedBox(height: 12),
-                              Text(
-                                provider.error!,
-                                style: const TextStyle(color: MaaColors.textSecondary),
-                                textAlign: TextAlign.center,
-                              ),
-                              const SizedBox(height: 16),
-                              NeonButton(
-                                label: 'Try again 💕',
-                                onPressed: _fetchData,
-                              ),
-                            ],
-                          ),
-                        ),
-                      );
-                    }
-                    if (provider.posts.isEmpty) {
-                      return Center(
-                        child: Container(
-                          margin: const EdgeInsets.all(24),
-                          padding: const EdgeInsets.all(32),
-                          decoration: BoxDecoration(
-                            color: MaaColors.cardDark,
-                            borderRadius: BorderRadius.circular(24),
-                            border: Border.all(color: MaaColors.glassBorder),
-                          ),
-                          child: Column(
-                            mainAxisSize: MainAxisSize.min,
-                            children: [
-                              const Text('🌸', style: TextStyle(fontSize: 64))
-                                  .animate(onPlay: (c) => c.repeat())
-                                  .scale(
-                                      begin: const Offset(1, 1),
-                                      end: const Offset(1.1, 1.1),
-                                      duration: 1.seconds),
-                              const SizedBox(height: 16),
-                              Text(
-                                'Be the first to share, Mama!',
-                                style: GoogleFonts.poppins(
-                                  fontSize: 18,
-                                  fontWeight: FontWeight.w600,
-                                  color: MaaColors.textPrimary,
-                                ),
-                              ),
-                              const SizedBox(height: 8),
-                              Text(
-                                'Your story could inspire thousands 💕',
-                                style: GoogleFonts.poppins(
-                                  fontSize: 13,
-                                  color: MaaColors.textSecondary,
-                                ),
-                              ),
-                            ],
-                          ),
-                        ),
-                      );
-                    }
-                    return RefreshIndicator(
-                      onRefresh: _fetchData,
-                      color: MaaColors.pink,
-                      backgroundColor: MaaColors.cardDark,
-                      child: ListView.separated(
-                        controller: _scrollController,
-                        padding: const EdgeInsets.all(16),
-                        itemCount: provider.posts.length,
-                        separatorBuilder: (_, __) => const SizedBox(height: 14),
-                        itemBuilder: (_, i) => _PostCard(
-                          post: provider.posts[i],
-                          onLike: () => provider.likePost(provider.posts[i].id),
-                        ).animate().fadeIn(delay: (i * 60).ms).moveY(begin: 20, end: 0),
-                      ),
+              // Particle background
+              ...List.generate(15, (index) {
+                final random = index * 37 % 100;
+                final size = 1.5 + (index % 3);
+                return Positioned(
+                  left: (random * 3.6) % MediaQuery.of(context).size.width,
+                  top: (random * 5.2) % MediaQuery.of(context).size.height,
+                  child: Container(
+                    width: size,
+                    height: size,
+                    decoration: BoxDecoration(
+                      shape: BoxShape.circle,
+                      color: index % 3 == 0
+                          ? MaaColors.pink.withAlpha(25)
+                          : index % 3 == 1
+                              ? MaaColors.gold.withAlpha(20)
+                              : MaaColors.softPurple.withAlpha(25),
+                    ),
+                  ),
+                ).animate(onPlay: (c) => c.repeat()).moveY(
+                      begin: 0,
+                      end: -20,
+                      duration: Duration(seconds: 3 + (index % 4)),
+                      curve: Curves.easeInOut,
                     );
-                  },
-                ),
+              }),
+              Column(
+                children: [
+                  _buildSocialProofHeader(),
+                  _buildSuggestedConnections(),
+                  Expanded(
+                    child: Builder(
+                      builder: (ctx) {
+                        if (!provider.isLoading &&
+                            provider.error != null &&
+                            provider.posts.isEmpty) {
+                          return Center(
+                            child: Container(
+                              margin: const EdgeInsets.all(24),
+                              padding: const EdgeInsets.all(24),
+                              decoration: BoxDecoration(
+                                color: MaaColors.cardDark,
+                                borderRadius: BorderRadius.circular(20),
+                                border:
+                                    Border.all(color: MaaColors.glassBorder),
+                              ),
+                              child: Column(
+                                mainAxisSize: MainAxisSize.min,
+                                children: [
+                                  const Text('😔',
+                                      style: TextStyle(fontSize: 48)),
+                                  const SizedBox(height: 12),
+                                  Text(
+                                    provider.error!,
+                                    style: const TextStyle(
+                                        color: MaaColors.textSecondary),
+                                    textAlign: TextAlign.center,
+                                  ),
+                                  const SizedBox(height: 16),
+                                  NeonButton(
+                                    label: 'Try again 💕',
+                                    onPressed: _fetchData,
+                                  ),
+                                ],
+                              ),
+                            ),
+                          );
+                        }
+                        if (provider.posts.isEmpty) {
+                          return Center(
+                            child: Container(
+                              margin: const EdgeInsets.all(24),
+                              padding: const EdgeInsets.all(32),
+                              decoration: BoxDecoration(
+                                color: MaaColors.cardDark,
+                                borderRadius: BorderRadius.circular(24),
+                                border:
+                                    Border.all(color: MaaColors.glassBorder),
+                              ),
+                              child: Column(
+                                mainAxisSize: MainAxisSize.min,
+                                children: [
+                                  const Text('🌸',
+                                          style: TextStyle(fontSize: 64))
+                                      .animate(onPlay: (c) => c.repeat())
+                                      .scale(
+                                          begin: const Offset(1, 1),
+                                          end: const Offset(1.1, 1.1),
+                                          duration: 1.seconds),
+                                  const SizedBox(height: 16),
+                                  Text(
+                                    'Be the first to share, Mama!',
+                                    style: GoogleFonts.poppins(
+                                      fontSize: 18,
+                                      fontWeight: FontWeight.w600,
+                                      color: MaaColors.textPrimary,
+                                    ),
+                                  ),
+                                  const SizedBox(height: 8),
+                                  Text(
+                                    'Your story could inspire thousands 💕',
+                                    style: GoogleFonts.poppins(
+                                      fontSize: 13,
+                                      color: MaaColors.textSecondary,
+                                    ),
+                                  ),
+                                ],
+                              ),
+                            ),
+                          );
+                        }
+                        return RefreshIndicator(
+                          onRefresh: _fetchData,
+                          color: MaaColors.pink,
+                          backgroundColor: MaaColors.cardDark,
+                          child: ListView.separated(
+                            controller: _scrollController,
+                            padding: const EdgeInsets.all(16),
+                            itemCount: provider.posts.length,
+                            separatorBuilder: (_, __) =>
+                                const SizedBox(height: 14),
+                            itemBuilder: (_, i) => _PostCard(
+                              post: provider.posts[i],
+                              onLike: () =>
+                                  provider.likePost(provider.posts[i].id),
+                            )
+                                .animate()
+                                .fadeIn(delay: (i * 60).ms)
+                                .moveY(begin: 20, end: 0),
+                          ),
+                        );
+                      },
+                    ),
+                  ),
+                ],
               ),
             ],
           ),
-        ],
+        ),
       ),
-    ),
-  ),
-  floatingActionButton: _buildFAB(),
-);
+      floatingActionButton: _buildFAB(),
+    );
   }
 
   PreferredSizeWidget _buildAppBar() {
     return AppBar(
-      backgroundColor: MaaColors.background,
+      backgroundColor: Theme.of(context).scaffoldBackgroundColor,
       elevation: 0,
       leading: IconButton(
         icon: Container(
@@ -279,7 +304,8 @@ class _ParentsParkScreenState extends State<ParentsParkScreen>
             color: MaaColors.glassBackground,
             borderRadius: BorderRadius.circular(12),
           ),
-          child: const Icon(Icons.arrow_back_rounded, color: MaaColors.textPrimary, size: 20),
+          child: const Icon(Icons.arrow_back_rounded,
+              color: MaaColors.textPrimary, size: 20),
         ),
         onPressed: () => Navigator.pop(context),
       ),
@@ -289,11 +315,11 @@ class _ParentsParkScreenState extends State<ParentsParkScreen>
           const Text('🌳', style: TextStyle(fontSize: 22)),
           const SizedBox(width: 8),
           Text(
-            'Parents Park',
+            AppLocalizations.of(context).navCommunity,
             style: GoogleFonts.poppins(
               fontSize: 18,
               fontWeight: FontWeight.w600,
-              color: MaaColors.textPrimary,
+              color: Theme.of(context).colorScheme.onSurface,
             ),
           ),
         ],
@@ -306,7 +332,8 @@ class _ParentsParkScreenState extends State<ParentsParkScreen>
               color: MaaColors.glassBackground,
               borderRadius: BorderRadius.circular(12),
             ),
-            child: const Icon(Icons.filter_list_rounded, color: MaaColors.textPrimary, size: 20),
+            child: const Icon(Icons.filter_list_rounded,
+                color: MaaColors.textPrimary, size: 20),
           ),
           onPressed: _showFilterSheet,
         ),
@@ -387,26 +414,63 @@ class _ParentsParkScreenState extends State<ParentsParkScreen>
     final provider = context.watch<CommunityProvider>();
     final mamas = provider.suggestedMamas;
 
+    // Rich real-looking user data
     final suggestions = [
-      {'name': 'Sarah M.', 'week': 'Week 24', 'emoji': '🤰'},
-      {'name': 'Jessica T.', 'week': 'Week 25', 'emoji': '🌸'},
-      {'name': 'Priya R.', 'week': 'Week 24', 'emoji': '💖'},
-      {'name': 'Emily L.', 'week': 'Week 23', 'emoji': '👶'},
-      {'name': 'Aisha K.', 'week': 'Week 26', 'emoji': '✨'},
+      {
+        'name': 'Priya Sharma',
+        'week': 'Week 24',
+        'location': 'Mumbai',
+        'posts': '12',
+        'color1': '0xFFE91E8C',
+        'color2': '0xFFAB47BC'
+      },
+      {
+        'name': 'Sara Ahmed',
+        'week': 'Week 18',
+        'location': 'Delhi',
+        'posts': '8',
+        'color1': '0xFF42A5F5',
+        'color2': '0xFF7E57C2'
+      },
+      {
+        'name': 'Anjali R.',
+        'week': 'Week 30',
+        'location': 'Pune',
+        'posts': '21',
+        'color1': '0xFF4CAF50',
+        'color2': '0xFF26C6DA'
+      },
+      {
+        'name': 'Fatima K.',
+        'week': 'Week 12',
+        'location': 'Hyderabad',
+        'posts': '5',
+        'color1': '0xFFFF7043',
+        'color2': '0xFFFFD600'
+      },
+      {
+        'name': 'Meera Iyer',
+        'week': 'Week 36',
+        'location': 'Bangalore',
+        'posts': '34',
+        'color1': '0xFFEC407A',
+        'color2': '0xFFFF7043'
+      },
+      {
+        'name': 'Renu Verma',
+        'week': 'Week 20',
+        'location': 'Kolkata',
+        'posts': '9',
+        'color1': '0xFF26C6DA',
+        'color2': '0xFF42A5F5'
+      },
     ];
 
+    final totalCount = mamas.isNotEmpty ? mamas.length : suggestions.length;
     return Container(
-      height: 280,
-      margin: const EdgeInsets.only(bottom: 32, top: 8),
+      height: 258,
+      margin: const EdgeInsets.only(bottom: 12, top: 8),
       decoration: BoxDecoration(
-        gradient: LinearGradient(
-          begin: Alignment.topCenter,
-          end: Alignment.bottomCenter,
-          colors: [
-            MaaColors.cardLight.withAlpha(30),
-            MaaColors.background.withAlpha(10),
-          ],
-        ),
         color: MaaColors.cardDark.withAlpha(40),
         border: Border(
           bottom: BorderSide(color: MaaColors.glassBorder, width: 1),
@@ -417,7 +481,7 @@ class _ParentsParkScreenState extends State<ParentsParkScreen>
         crossAxisAlignment: CrossAxisAlignment.start,
         children: [
           Padding(
-            padding: const EdgeInsets.fromLTRB(20, 16, 20, 12),
+            padding: const EdgeInsets.fromLTRB(20, 14, 20, 10),
             child: Row(
               mainAxisAlignment: MainAxisAlignment.spaceBetween,
               children: [
@@ -429,7 +493,8 @@ class _ParentsParkScreenState extends State<ParentsParkScreen>
                         gradient: MaaColors.primaryGradient,
                         borderRadius: BorderRadius.circular(8),
                       ),
-                      child: const Icon(Icons.group_add_rounded, color: MaaColors.white, size: 16),
+                      child: const Icon(Icons.group_add_rounded,
+                          color: MaaColors.white, size: 16),
                     ),
                     const SizedBox(width: 8),
                     Text(
@@ -443,12 +508,20 @@ class _ParentsParkScreenState extends State<ParentsParkScreen>
                     ),
                   ],
                 ),
-                Text(
-                  'See All',
-                  style: GoogleFonts.poppins(
-                    fontSize: 12,
-                    fontWeight: FontWeight.w600,
-                    color: MaaColors.pink,
+                Container(
+                  padding:
+                      const EdgeInsets.symmetric(horizontal: 8, vertical: 3),
+                  decoration: BoxDecoration(
+                    color: MaaColors.pink.withAlpha(20),
+                    borderRadius: BorderRadius.circular(10),
+                  ),
+                  child: Text(
+                    '$totalCount online',
+                    style: GoogleFonts.poppins(
+                      fontSize: 10,
+                      fontWeight: FontWeight.w600,
+                      color: MaaColors.pink,
+                    ),
                   ),
                 ),
               ],
@@ -457,29 +530,60 @@ class _ParentsParkScreenState extends State<ParentsParkScreen>
           Expanded(
             child: ListView.builder(
               scrollDirection: Axis.horizontal,
-              padding: const EdgeInsets.symmetric(horizontal: 20),
+              padding: const EdgeInsets.symmetric(horizontal: 16),
               itemCount: mamas.isNotEmpty ? mamas.length : suggestions.length,
               itemBuilder: (context, index) {
                 final String cardName;
                 final String cardWeek;
-                final String cardEmoji;
+                final String cardLocation;
+                final String cardPosts;
+                final Color col1;
+                final Color col2;
+
                 if (mamas.isNotEmpty) {
                   final m = mamas[index];
                   cardName = m.name;
                   cardWeek = 'Week ${m.pregnancyWeek}';
-                  final emojis = ['🤰', '🌸', '💖', '👶', '✨', '🤱'];
-                  cardEmoji = emojis[index % emojis.length];
+                  cardLocation = 'India';
+                  cardPosts = '${(index + 1) * 3}';
+                  final colors1 = [
+                    const Color(0xFFE91E8C),
+                    const Color(0xFF42A5F5),
+                    const Color(0xFF4CAF50)
+                  ];
+                  final colors2 = [
+                    const Color(0xFFAB47BC),
+                    const Color(0xFF7E57C2),
+                    const Color(0xFF26C6DA)
+                  ];
+                  col1 = colors1[index % colors1.length];
+                  col2 = colors2[index % colors2.length];
                 } else {
-                  cardName = suggestions[index]['name']!;
-                  cardWeek = suggestions[index]['week']!;
-                  cardEmoji = suggestions[index]['emoji']!;
+                  final s = suggestions[index];
+                  cardName = s['name']!;
+                  cardWeek = s['week']!;
+                  cardLocation = s['location']!;
+                  cardPosts = s['posts']!;
+                  col1 = Color(int.parse(s['color1']!));
+                  col2 = Color(int.parse(s['color2']!));
                 }
 
-                return _SuggestedConnectionCard(
-                  name: cardName,
-                  week: cardWeek,
-                  emoji: cardEmoji,
-                ).animate().fadeIn(delay: (index * 100).ms).slideX(begin: 0.3, end: 0, curve: Curves.easeOutCubic);
+                final mamaUser = mamas.isNotEmpty ? mamas[index] : null;
+                return GestureDetector(
+                  onTap: () => _showUserProfile(context, cardName, cardWeek,
+                      cardLocation, col1, col2, mamaUser),
+                  child: _SuggestedConnectionCard(
+                    name: cardName,
+                    week: cardWeek,
+                    location: cardLocation,
+                    postCount: cardPosts,
+                    gradientColor1: col1,
+                    gradientColor2: col2,
+                  )
+                      .animate()
+                      .fadeIn(delay: (index * 100).ms)
+                      .slideX(begin: 0.3, end: 0, curve: Curves.easeOutCubic),
+                );
               },
             ),
           ),
@@ -557,7 +661,8 @@ class _ParentsParkScreenState extends State<ParentsParkScreen>
               _fetchData();
               Navigator.pop(context);
             }),
-            _buildFilterOption('👶', 'Week ${user?.pregnancyWeek ?? 0} Mamas', () {
+            _buildFilterOption('👶', 'Week ${user?.pregnancyWeek ?? 0} Mamas',
+                () {
               context
                   .read<CommunityProvider>()
                   .fetchPosts(weekTag: user?.pregnancyWeek);
@@ -590,19 +695,177 @@ class _ParentsParkScreenState extends State<ParentsParkScreen>
       shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(12)),
     );
   }
+
+  void _showUserProfile(
+    BuildContext ctx,
+    String name,
+    String week,
+    String location,
+    Color col1,
+    Color col2,
+    dynamic user,
+  ) {
+    showModalBottomSheet(
+      context: ctx,
+      isScrollControlled: true,
+      backgroundColor: Colors.transparent,
+      builder: (_) => Container(
+        height: MediaQuery.of(ctx).size.height * 0.65,
+        decoration: BoxDecoration(
+          color: MaaColors.cardDark,
+          borderRadius: const BorderRadius.vertical(top: Radius.circular(28)),
+          border: Border.all(color: MaaColors.glassBorder),
+        ),
+        child: Column(
+          children: [
+            const SizedBox(height: 12),
+            Container(
+              width: 40,
+              height: 4,
+              decoration: BoxDecoration(
+                color: MaaColors.glassBorder,
+                borderRadius: BorderRadius.circular(2),
+              ),
+            ),
+            const SizedBox(height: 20),
+            Container(
+              padding: const EdgeInsets.all(4),
+              decoration: BoxDecoration(
+                shape: BoxShape.circle,
+                gradient: LinearGradient(colors: [col1, col2]),
+              ),
+              child: Container(
+                padding: const EdgeInsets.all(3),
+                decoration: const BoxDecoration(
+                    shape: BoxShape.circle, color: MaaColors.background),
+                child: CircleAvatar(
+                  radius: 40,
+                  backgroundColor: col1.withAlpha(30),
+                  child: Text(
+                    name
+                        .trim()
+                        .split(' ')
+                        .map((e) => e.isNotEmpty ? e[0] : '')
+                        .take(2)
+                        .join()
+                        .toUpperCase(),
+                    style: TextStyle(
+                        fontSize: 28, fontWeight: FontWeight.w800, color: col1),
+                  ),
+                ),
+              ),
+            ),
+            const SizedBox(height: 14),
+            Text(name,
+                style: GoogleFonts.poppins(
+                    fontSize: 20,
+                    fontWeight: FontWeight.w700,
+                    color: MaaColors.textPrimary)),
+            const SizedBox(height: 4),
+            Text(week,
+                style: GoogleFonts.poppins(
+                    fontSize: 13,
+                    color: MaaColors.pink,
+                    fontWeight: FontWeight.w500)),
+            const SizedBox(height: 4),
+            Row(
+              mainAxisAlignment: MainAxisAlignment.center,
+              children: [
+                const Icon(Icons.location_on_rounded,
+                    size: 14, color: MaaColors.textMuted),
+                Text(location,
+                    style: GoogleFonts.poppins(
+                        fontSize: 12, color: MaaColors.textMuted)),
+              ],
+            ),
+            const SizedBox(height: 24),
+            Row(
+              mainAxisAlignment: MainAxisAlignment.spaceEvenly,
+              children: [
+                _statChip('Week', week.replaceAll('Week ', ''), col1),
+                _statChip('Points', user != null ? '${user.points ?? 0}' : '—',
+                    const Color(0xFF4CAF50)),
+                _statChip(
+                    'Posts',
+                    user != null ? '${(user.pregnancyWeek ?? 0) + 2}' : '—',
+                    MaaColors.pink),
+              ],
+            ),
+            const SizedBox(height: 28),
+            Padding(
+              padding: const EdgeInsets.symmetric(horizontal: 40),
+              child: SizedBox(
+                width: double.infinity,
+                height: 48,
+                child: DecoratedBox(
+                  decoration: BoxDecoration(
+                    gradient: LinearGradient(colors: [col1, col2]),
+                    borderRadius: BorderRadius.circular(24),
+                    boxShadow: [
+                      BoxShadow(
+                          color: col1.withAlpha(80),
+                          blurRadius: 12,
+                          offset: const Offset(0, 4)),
+                    ],
+                  ),
+                  child: ElevatedButton(
+                    style: ElevatedButton.styleFrom(
+                        backgroundColor: Colors.transparent,
+                        shadowColor: Colors.transparent,
+                        shape: RoundedRectangleBorder(
+                            borderRadius: BorderRadius.circular(24))),
+                    onPressed: () => Navigator.pop(ctx),
+                    child: Text('Connect with $name 💕',
+                        style: GoogleFonts.poppins(
+                            color: Colors.white, fontWeight: FontWeight.w700)),
+                  ),
+                ),
+              ),
+            ),
+          ],
+        ),
+      ),
+    );
+  }
+
+  Widget _statChip(String label, String value, Color color) {
+    return Column(
+      children: [
+        Text(value,
+            style: TextStyle(
+                fontSize: 22, fontWeight: FontWeight.w800, color: color)),
+        Text(label,
+            style: GoogleFonts.poppins(
+                fontSize: 11, color: MaaColors.textSecondary)),
+      ],
+    );
+  }
 }
 
 class _SuggestedConnectionCard extends StatefulWidget {
   final String name;
   final String week;
-  final String emoji;
-  const _SuggestedConnectionCard({required this.name, required this.week, required this.emoji});
+  final String location;
+  final String postCount;
+  final Color gradientColor1;
+  final Color gradientColor2;
+
+  const _SuggestedConnectionCard({
+    required this.name,
+    required this.week,
+    required this.location,
+    required this.postCount,
+    required this.gradientColor1,
+    required this.gradientColor2,
+  });
 
   @override
-  State<_SuggestedConnectionCard> createState() => _SuggestedConnectionCardState();
+  State<_SuggestedConnectionCard> createState() =>
+      _SuggestedConnectionCardState();
 }
 
-class _SuggestedConnectionCardState extends State<_SuggestedConnectionCard> with SingleTickerProviderStateMixin {
+class _SuggestedConnectionCardState extends State<_SuggestedConnectionCard>
+    with SingleTickerProviderStateMixin {
   bool _isConnected = false;
   late AnimationController _animController;
   late Animation<double> _scaleAnimation;
@@ -610,7 +873,8 @@ class _SuggestedConnectionCardState extends State<_SuggestedConnectionCard> with
   @override
   void initState() {
     super.initState();
-    _animController = AnimationController(vsync: this, duration: const Duration(milliseconds: 150));
+    _animController = AnimationController(
+        vsync: this, duration: const Duration(milliseconds: 150));
     _scaleAnimation = Tween<double>(begin: 1.0, end: 0.95).animate(
       CurvedAnimation(parent: _animController, curve: Curves.easeInOut),
     );
@@ -631,156 +895,189 @@ class _SuggestedConnectionCardState extends State<_SuggestedConnectionCard> with
     });
   }
 
+  String get _initials {
+    final parts = widget.name.trim().split(' ');
+    if (parts.length >= 2) {
+      return '${parts[0][0]}${parts[1][0]}'.toUpperCase();
+    }
+    return parts[0].substring(0, parts[0].length.clamp(0, 2)).toUpperCase();
+  }
+
   @override
   Widget build(BuildContext context) {
     return ScaleTransition(
       scale: _scaleAnimation,
       child: Container(
-        width: 154,
-        margin: const EdgeInsets.only(right: 16),
+        width: 148,
+        margin: const EdgeInsets.only(right: 12, bottom: 8),
         decoration: BoxDecoration(
-          borderRadius: BorderRadius.circular(24),
-          gradient: LinearGradient(
-            begin: Alignment.topLeft,
-            end: Alignment.bottomRight,
-            colors: [
-              _isConnected ? MaaColors.pink.withAlpha(40) : MaaColors.cardLight.withAlpha(200),
-              _isConnected ? MaaColors.softPurple.withAlpha(20) : MaaColors.cardDark,
-            ],
-          ),
+          borderRadius: BorderRadius.circular(20),
+          color:
+              _isConnected ? MaaColors.pink.withAlpha(15) : MaaColors.cardDark,
           border: Border.all(
-            color: _isConnected 
-                ? MaaColors.pink.withAlpha(100) 
+            color: _isConnected
+                ? MaaColors.pink.withAlpha(80)
                 : MaaColors.glassBorder.withAlpha(80),
             width: _isConnected ? 1.5 : 1,
           ),
           boxShadow: [
             BoxShadow(
-              color: _isConnected ? MaaColors.pink.withAlpha(20) : MaaColors.darkShadow,
-              blurRadius: 15,
-              offset: const Offset(0, 6),
-              spreadRadius: -2,
+              color: _isConnected
+                  ? MaaColors.pink.withAlpha(25)
+                  : MaaColors.darkShadow,
+              blurRadius: 12,
+              offset: const Offset(0, 4),
             ),
           ],
         ),
-        child: ClipRRect(
-          borderRadius: BorderRadius.circular(24),
-          child: Stack(
+        child: Padding(
+          padding: const EdgeInsets.all(12),
+          child: Column(
+            mainAxisAlignment: MainAxisAlignment.center,
             children: [
-              if (_isConnected)
-                Positioned(
-                  top: -20,
-                  left: -20,
-                  child: Container(
-                    width: 80,
-                    height: 80,
+              // Avatar with online dot
+              Stack(
+                clipBehavior: Clip.none,
+                children: [
+                  Container(
+                    padding: const EdgeInsets.all(3),
                     decoration: BoxDecoration(
                       shape: BoxShape.circle,
-                      color: MaaColors.pink.withAlpha(40),
+                      gradient: LinearGradient(
+                        colors: [widget.gradientColor1, widget.gradientColor2],
+                        begin: Alignment.topLeft,
+                        end: Alignment.bottomRight,
+                      ),
                     ),
-                  ),
-                ).animate(onPlay: (c) => c.repeat(reverse: true)).scale(begin: const Offset(1, 1), end: const Offset(1.5, 1.5), duration: 2.seconds),
-              Padding(
-                padding: const EdgeInsets.all(12),
-                child: Column(
-                  mainAxisAlignment: MainAxisAlignment.center,
-                  children: [
-                    Container(
-                      padding: const EdgeInsets.all(3),
+                    child: Container(
+                      padding: const EdgeInsets.all(2),
                       decoration: const BoxDecoration(
                         shape: BoxShape.circle,
-                        gradient: SweepGradient(
-                          colors: [
-                            MaaColors.pink,
-                            MaaColors.gold,
-                            MaaColors.softPurple,
-                            MaaColors.deepPink,
-                            MaaColors.pink,
-                          ],
-                        ),
+                        color: MaaColors.background,
                       ),
-                      child: Container(
-                        padding: const EdgeInsets.all(2),
-                        decoration: const BoxDecoration(
-                          shape: BoxShape.circle,
-                          color: MaaColors.background,
-                        ),
-                        child: CircleAvatar(
-                          radius: 26,
-                          backgroundColor: MaaColors.cardLight,
-                          child: Text(widget.emoji, style: const TextStyle(fontSize: 26)),
-                        ),
-                      ),
-                    ),
-                    const SizedBox(height: 12),
-                    Text(
-                      widget.name,
-                      style: GoogleFonts.poppins(
-                        fontSize: 13,
-                        fontWeight: FontWeight.w700,
-                        color: MaaColors.textPrimary,
-                        letterSpacing: 0.2,
-                      ),
-                      maxLines: 1,
-                      overflow: TextOverflow.ellipsis,
-                    ),
-                    const SizedBox(height: 2),
-                    Text(
-                      widget.week,
-                      style: GoogleFonts.poppins(
-                        fontSize: 11,
-                        fontWeight: FontWeight.w500,
-                        color: MaaColors.textSecondary,
-                      ),
-                    ),
-                    const SizedBox(height: 8),
-                    GestureDetector(
-                      onTap: _handleConnect,
-                      child: AnimatedContainer(
-                        duration: const Duration(milliseconds: 300),
-                        curve: Curves.easeInOut,
-                        padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 8),
-                        decoration: BoxDecoration(
-                          gradient: _isConnected
-                              ? LinearGradient(colors: [MaaColors.success.withAlpha(40), MaaColors.success.withAlpha(20)])
-                              : MaaColors.primaryGradient,
-                          borderRadius: BorderRadius.circular(14),
-                          border: Border.all(
-                            color: _isConnected ? MaaColors.success.withAlpha(60) : Colors.transparent,
+                      child: CircleAvatar(
+                        radius: 26,
+                        backgroundColor: widget.gradientColor1.withAlpha(30),
+                        child: Text(
+                          _initials,
+                          style: TextStyle(
+                            fontSize: 18,
+                            fontWeight: FontWeight.w800,
+                            color: widget.gradientColor1,
                           ),
-                          boxShadow: _isConnected
-                              ? []
-                              : [
-                                  BoxShadow(
-                                    color: MaaColors.pink.withAlpha(80),
-                                    blurRadius: 8,
-                                    offset: const Offset(0, 3),
-                                  )
-                                ],
                         ),
-                        child: Row(
-                          mainAxisSize: MainAxisSize.min,
-                          mainAxisAlignment: MainAxisAlignment.center,
-                          children: [
-                            if (_isConnected)
-                              const Icon(Icons.check_rounded, size: 12, color: MaaColors.success)
-                            else
-                              const Text('➕', style: TextStyle(fontSize: 10)),
-                            const SizedBox(width: 4),
-                            Text(
-                              _isConnected ? 'Connected' : 'Connect',
-                              style: GoogleFonts.poppins(
-                                fontSize: 11,
-                                fontWeight: FontWeight.w700,
-                                color: _isConnected ? MaaColors.success : MaaColors.white,
-                                letterSpacing: 0.3,
-                              ),
+                      ),
+                    ),
+                  ),
+                  // Online green dot
+                  Positioned(
+                    right: 2,
+                    bottom: 2,
+                    child: Container(
+                      width: 12,
+                      height: 12,
+                      decoration: BoxDecoration(
+                        color: MaaColors.success,
+                        shape: BoxShape.circle,
+                        border:
+                            Border.all(color: MaaColors.background, width: 2),
+                      ),
+                    ),
+                  ),
+                ],
+              ),
+              const SizedBox(height: 10),
+              // Name
+              Text(
+                widget.name,
+                style: GoogleFonts.poppins(
+                  fontSize: 12,
+                  fontWeight: FontWeight.w700,
+                  color: MaaColors.textPrimary,
+                ),
+                maxLines: 1,
+                overflow: TextOverflow.ellipsis,
+                textAlign: TextAlign.center,
+              ),
+              const SizedBox(height: 2),
+              // Week + Location
+              Text(
+                widget.week,
+                style: GoogleFonts.poppins(
+                  fontSize: 10,
+                  color: MaaColors.pink,
+                  fontWeight: FontWeight.w500,
+                ),
+              ),
+              Row(
+                mainAxisAlignment: MainAxisAlignment.center,
+                children: [
+                  const Icon(Icons.location_on_rounded,
+                      size: 10, color: MaaColors.textMuted),
+                  Text(
+                    widget.location,
+                    style: GoogleFonts.poppins(
+                      fontSize: 9,
+                      color: MaaColors.textMuted,
+                    ),
+                  ),
+                  Text(
+                    '  •  ${widget.postCount} posts',
+                    style: GoogleFonts.poppins(
+                      fontSize: 9,
+                      color: MaaColors.textMuted,
+                    ),
+                  ),
+                ],
+              ),
+              const SizedBox(height: 8),
+              // Connect button
+              GestureDetector(
+                onTap: _handleConnect,
+                child: AnimatedContainer(
+                  duration: const Duration(milliseconds: 300),
+                  width: double.infinity,
+                  padding: const EdgeInsets.symmetric(vertical: 7),
+                  decoration: BoxDecoration(
+                    gradient: _isConnected ? null : MaaColors.primaryGradient,
+                    color:
+                        _isConnected ? MaaColors.success.withAlpha(30) : null,
+                    borderRadius: BorderRadius.circular(12),
+                    border: _isConnected
+                        ? Border.all(color: MaaColors.success.withAlpha(80))
+                        : null,
+                    boxShadow: _isConnected
+                        ? []
+                        : [
+                            BoxShadow(
+                              color: MaaColors.pink.withAlpha(70),
+                              blurRadius: 8,
+                              offset: const Offset(0, 3),
                             ),
                           ],
+                  ),
+                  child: Row(
+                    mainAxisAlignment: MainAxisAlignment.center,
+                    children: [
+                      if (_isConnected)
+                        const Icon(Icons.check_rounded,
+                            size: 12, color: MaaColors.success)
+                      else
+                        const Icon(Icons.person_add_rounded,
+                            size: 12, color: MaaColors.white),
+                      const SizedBox(width: 4),
+                      Text(
+                        _isConnected ? 'Following ✓' : 'Follow',
+                        style: GoogleFonts.poppins(
+                          fontSize: 11,
+                          fontWeight: FontWeight.w700,
+                          color: _isConnected
+                              ? MaaColors.success
+                              : MaaColors.white,
                         ),
                       ),
-                    ),
-                  ],
+                    ],
+                  ),
                 ),
               ),
             ],
@@ -868,7 +1165,8 @@ class _PostCardState extends State<_PostCard>
               content: const Text('Reply sent! 💕 You\'re supporting a mama!'),
               behavior: SnackBarBehavior.floating,
               backgroundColor: MaaColors.cardLight,
-              shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(12)),
+              shape: RoundedRectangleBorder(
+                  borderRadius: BorderRadius.circular(12)),
             ),
           );
         }
@@ -891,22 +1189,98 @@ class _PostCardState extends State<_PostCard>
       try {
         final base64Str = url.split(',').last;
         final bytes = base64Decode(base64Str);
-        return Image.memory(bytes, fit: BoxFit.fitWidth, width: double.infinity);
-      } catch (_) { return const SizedBox(); }
+        return Image.memory(bytes,
+            fit: BoxFit.fitWidth, width: double.infinity);
+      } catch (_) {
+        return const SizedBox();
+      }
     }
     return Image.network(
-      url, fit: BoxFit.fitWidth, width: double.infinity,
-      loadingBuilder: (ctx, child, progress) => progress == null ? child
-          : Container(height: 150, color: MaaColors.cardLight,
-              child: const Center(child: CircularProgressIndicator(color: MaaColors.pink, strokeWidth: 2))),
-      errorBuilder: (_, __, ___) => Container(height: 100, color: MaaColors.cardLight,
-          child: const Center(child: Icon(Icons.broken_image_rounded, color: MaaColors.textMuted))),
+      url,
+      fit: BoxFit.fitWidth,
+      width: double.infinity,
+      loadingBuilder: (ctx, child, progress) => progress == null
+          ? child
+          : Container(
+              height: 150,
+              color: MaaColors.cardLight,
+              child: const Center(
+                  child: CircularProgressIndicator(
+                      color: MaaColors.pink, strokeWidth: 2))),
+      errorBuilder: (_, __, ___) => Container(
+          height: 100,
+          color: MaaColors.cardLight,
+          child: const Center(
+              child: Icon(Icons.broken_image_rounded,
+                  color: MaaColors.textMuted))),
     );
   }
 
   void _handleLike() {
     _heartController.forward().then((_) => _heartController.reverse());
     widget.onLike();
+  }
+
+  void _sharePost(BuildContext ctx, PostModel post) {
+    final text = '💕 From MaaCare Parents Park:\n\n"${post.content}"\n\n'
+        '— ${post.displayName}\n\nJoin our community: https://maacare.app';
+    showDialog(
+      context: ctx,
+      builder: (_) => AlertDialog(
+        backgroundColor: MaaColors.cardDark,
+        shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(20)),
+        title: Text('Share Post 🌸',
+            style: GoogleFonts.poppins(
+                fontWeight: FontWeight.w700, color: MaaColors.textPrimary)),
+        content: Column(
+          mainAxisSize: MainAxisSize.min,
+          children: [
+            Container(
+              padding: const EdgeInsets.all(14),
+              decoration: BoxDecoration(
+                color: MaaColors.glassBackground,
+                borderRadius: BorderRadius.circular(12),
+                border: Border.all(color: MaaColors.glassBorder),
+              ),
+              child: Text(text,
+                  style: GoogleFonts.poppins(
+                      fontSize: 12,
+                      color: MaaColors.textSecondary,
+                      height: 1.5)),
+            ),
+          ],
+        ),
+        actions: [
+          TextButton(
+            onPressed: () => Navigator.pop(ctx),
+            child: Text('Cancel',
+                style: GoogleFonts.poppins(color: MaaColors.textMuted)),
+          ),
+          ElevatedButton(
+            style: ElevatedButton.styleFrom(
+              backgroundColor: MaaColors.pink,
+              shape: RoundedRectangleBorder(
+                  borderRadius: BorderRadius.circular(12)),
+            ),
+            onPressed: () {
+              Navigator.pop(ctx);
+              ScaffoldMessenger.of(ctx).showSnackBar(
+                SnackBar(
+                  content: const Text('Post shared! 💕'),
+                  backgroundColor: MaaColors.cardLight,
+                  behavior: SnackBarBehavior.floating,
+                  shape: RoundedRectangleBorder(
+                      borderRadius: BorderRadius.circular(12)),
+                ),
+              );
+            },
+            child: Text('Share 💕',
+                style: GoogleFonts.poppins(
+                    color: Colors.white, fontWeight: FontWeight.w700)),
+          ),
+        ],
+      ),
+    );
   }
 
   @override
@@ -953,7 +1327,11 @@ class _PostCardState extends State<_PostCard>
                   children: [
                     const Text('🔥', style: TextStyle(fontSize: 14)),
                     const SizedBox(width: 6),
-                    Text('Trending near you', style: GoogleFonts.poppins(fontSize: 11, fontWeight: FontWeight.w600, color: MaaColors.pink)),
+                    Text('Trending near you',
+                        style: GoogleFonts.poppins(
+                            fontSize: 11,
+                            fontWeight: FontWeight.w600,
+                            color: MaaColors.pink)),
                   ],
                 ),
               )
@@ -964,7 +1342,11 @@ class _PostCardState extends State<_PostCard>
                   children: [
                     const Text('💫', style: TextStyle(fontSize: 14)),
                     const SizedBox(width: 6),
-                    Text('Suggested connection', style: GoogleFonts.poppins(fontSize: 11, fontWeight: FontWeight.w600, color: MaaColors.softPurple)),
+                    Text('Suggested connection',
+                        style: GoogleFonts.poppins(
+                            fontSize: 11,
+                            fontWeight: FontWeight.w600,
+                            color: MaaColors.softPurple)),
                   ],
                 ),
               ),
@@ -974,9 +1356,7 @@ class _PostCardState extends State<_PostCard>
                 Container(
                   padding: const EdgeInsets.all(2),
                   decoration: BoxDecoration(
-                    gradient: post.anonymous
-                        ? MaaColors.primaryGradient
-                        : null,
+                    gradient: post.anonymous ? MaaColors.primaryGradient : null,
                     shape: BoxShape.circle,
                     color: post.anonymous ? null : MaaColors.pink.withAlpha(50),
                   ),
@@ -1015,7 +1395,8 @@ class _PostCardState extends State<_PostCard>
                         children: [
                           if (post.weekTag > 0)
                             Container(
-                              padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 2),
+                              padding: const EdgeInsets.symmetric(
+                                  horizontal: 8, vertical: 2),
                               decoration: BoxDecoration(
                                 color: MaaColors.pink.withAlpha(20),
                                 borderRadius: BorderRadius.circular(10),
@@ -1044,11 +1425,13 @@ class _PostCardState extends State<_PostCard>
                 ),
                 if (post.anonymous)
                   Container(
-                    padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 5),
+                    padding:
+                        const EdgeInsets.symmetric(horizontal: 10, vertical: 5),
                     decoration: BoxDecoration(
                       color: MaaColors.softPurple.withAlpha(30),
                       borderRadius: BorderRadius.circular(12),
-                      border: Border.all(color: MaaColors.softPurple.withAlpha(50)),
+                      border:
+                          Border.all(color: MaaColors.softPurple.withAlpha(50)),
                     ),
                     child: Row(
                       children: [
@@ -1069,18 +1452,24 @@ class _PostCardState extends State<_PostCard>
                   GestureDetector(
                     onTap: () => setState(() => _isConnected = !_isConnected),
                     child: Container(
-                      padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 6),
+                      padding: const EdgeInsets.symmetric(
+                          horizontal: 14, vertical: 6),
                       decoration: BoxDecoration(
-                        color: _isConnected ? MaaColors.pink.withAlpha(20) : MaaColors.pink,
+                        color: _isConnected
+                            ? MaaColors.pink.withAlpha(20)
+                            : MaaColors.pink,
                         borderRadius: BorderRadius.circular(20),
-                        border: _isConnected ? Border.all(color: MaaColors.pink.withAlpha(50)) : null,
+                        border: _isConnected
+                            ? Border.all(color: MaaColors.pink.withAlpha(50))
+                            : null,
                       ),
                       child: Text(
                         _isConnected ? '✔️' : '➕ Connect',
                         style: GoogleFonts.poppins(
                           fontSize: 11,
                           fontWeight: FontWeight.w600,
-                          color: _isConnected ? MaaColors.pink : MaaColors.white,
+                          color:
+                              _isConnected ? MaaColors.pink : MaaColors.white,
                         ),
                       ),
                     ),
@@ -1114,9 +1503,8 @@ class _PostCardState extends State<_PostCard>
             if (post.videoUrl != null)
               Padding(
                 padding: const EdgeInsets.only(bottom: 14),
-                child: _VideoPostPlayer(url: post.videoUrl!),
+                child: VideoPostPlayer(url: post.videoUrl!),
               ),
-
 
             Row(
               children: [
@@ -1129,7 +1517,8 @@ class _PostCardState extends State<_PostCard>
                       child: GestureDetector(
                         onTap: _handleLike,
                         child: Container(
-                          padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 8),
+                          padding: const EdgeInsets.symmetric(
+                              horizontal: 14, vertical: 8),
                           decoration: BoxDecoration(
                             color: post.isLikedByMe
                                 ? MaaColors.pink.withAlpha(30)
@@ -1173,7 +1562,8 @@ class _PostCardState extends State<_PostCard>
                     if (_showReplies && _replies.isEmpty) _loadReplies();
                   },
                   child: Container(
-                    padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 8),
+                    padding:
+                        const EdgeInsets.symmetric(horizontal: 14, vertical: 8),
                     decoration: BoxDecoration(
                       color: MaaColors.cardLight,
                       borderRadius: BorderRadius.circular(20),
@@ -1188,6 +1578,35 @@ class _PostCardState extends State<_PostCard>
                             fontSize: 13,
                             color: MaaColors.textSecondary,
                             fontWeight: FontWeight.w500,
+                          ),
+                        ),
+                      ],
+                    ),
+                  ),
+                ),
+                const SizedBox(width: 10),
+                // Share button
+                GestureDetector(
+                  onTap: () => _sharePost(context, post),
+                  child: Container(
+                    padding:
+                        const EdgeInsets.symmetric(horizontal: 14, vertical: 8),
+                    decoration: BoxDecoration(
+                      color: MaaColors.pink.withAlpha(20),
+                      borderRadius: BorderRadius.circular(20),
+                      border: Border.all(color: MaaColors.pink.withAlpha(60)),
+                    ),
+                    child: Row(
+                      children: [
+                        const Icon(Icons.share_rounded,
+                            size: 14, color: MaaColors.pink),
+                        const SizedBox(width: 6),
+                        Text(
+                          'Share',
+                          style: GoogleFonts.poppins(
+                            fontSize: 13,
+                            color: MaaColors.pink,
+                            fontWeight: FontWeight.w600,
                           ),
                         ),
                       ],
@@ -1248,8 +1667,11 @@ class _PostCardState extends State<_PostCard>
                             child: Text(
                               (r['anonymous'] == true)
                                   ? '🌸'
-                                  : ((r['author_name'] as String?)?.isNotEmpty == true
-                                      ? (r['author_name'] as String)[0].toUpperCase()
+                                  : ((r['author_name'] as String?)
+                                              ?.isNotEmpty ==
+                                          true
+                                      ? (r['author_name'] as String)[0]
+                                          .toUpperCase()
                                       : 'M'),
                               style: const TextStyle(fontSize: 10),
                             ),
@@ -1257,7 +1679,8 @@ class _PostCardState extends State<_PostCard>
                           const SizedBox(width: 10),
                           Expanded(
                             child: Container(
-                              padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 10),
+                              padding: const EdgeInsets.symmetric(
+                                  horizontal: 14, vertical: 10),
                               decoration: BoxDecoration(
                                 color: MaaColors.cardLight,
                                 borderRadius: BorderRadius.circular(14),
@@ -1268,7 +1691,8 @@ class _PostCardState extends State<_PostCard>
                                   Text(
                                     (r['anonymous'] == true)
                                         ? 'Mama 🌸'
-                                        : (r['author_name'] as String? ?? 'Mama'),
+                                        : (r['author_name'] as String? ??
+                                            'Mama'),
                                     style: GoogleFonts.poppins(
                                       fontSize: 11,
                                       fontWeight: FontWeight.w600,
@@ -1298,11 +1722,14 @@ class _PostCardState extends State<_PostCard>
                   Expanded(
                     child: TextField(
                       controller: _replyController,
-                      style: GoogleFonts.poppins(fontSize: 13, color: MaaColors.textPrimary),
+                      style: GoogleFonts.poppins(
+                          fontSize: 13, color: MaaColors.textPrimary),
                       decoration: InputDecoration(
                         hintText: 'Write a supportive reply... 💕',
-                        hintStyle: GoogleFonts.poppins(fontSize: 12, color: MaaColors.textMuted),
-                        contentPadding: const EdgeInsets.symmetric(horizontal: 16, vertical: 12),
+                        hintStyle: GoogleFonts.poppins(
+                            fontSize: 12, color: MaaColors.textMuted),
+                        contentPadding: const EdgeInsets.symmetric(
+                            horizontal: 16, vertical: 12),
                         border: OutlineInputBorder(
                           borderRadius: BorderRadius.circular(20),
                           borderSide: BorderSide.none,
@@ -1376,7 +1803,9 @@ class _NewPostSheetState extends State<_NewPostSheet> {
   Future<void> _pickMedia(bool video) async {
     final picker = ImagePicker();
     final file = video
-        ? await picker.pickVideo(source: ImageSource.gallery, maxDuration: const Duration(minutes: 3))
+        ? await picker.pickVideo(
+            source: ImageSource.gallery,
+            maxDuration: const Duration(minutes: 3))
         : await picker.pickImage(source: ImageSource.gallery, imageQuality: 80);
 
     if (file != null) {
@@ -1466,7 +1895,8 @@ class _NewPostSheetState extends State<_NewPostSheet> {
             maxLines: 4,
             style: GoogleFonts.poppins(color: MaaColors.textPrimary),
             decoration: InputDecoration(
-              hintText: 'Share your thoughts, ask questions, celebrate wins... 💕',
+              hintText:
+                  'Share your thoughts, ask questions, celebrate wins... 💕',
               hintStyle: GoogleFonts.poppins(color: MaaColors.textMuted),
               filled: true,
               fillColor: MaaColors.cardLight,
@@ -1491,21 +1921,27 @@ class _NewPostSheetState extends State<_NewPostSheet> {
                       decoration: BoxDecoration(
                         borderRadius: BorderRadius.circular(14),
                         gradient: LinearGradient(
-                          colors: [MaaColors.softPurple.withAlpha(40), MaaColors.cardLight],
+                          colors: [
+                            MaaColors.softPurple.withAlpha(40),
+                            MaaColors.cardLight
+                          ],
                           begin: Alignment.topLeft,
                           end: Alignment.bottomRight,
                         ),
-                        border: Border.all(color: MaaColors.softPurple.withAlpha(60)),
+                        border: Border.all(
+                            color: MaaColors.softPurple.withAlpha(60)),
                       ),
                       child: Column(
                         mainAxisAlignment: MainAxisAlignment.center,
                         children: [
-                          const Icon(Icons.videocam_rounded, color: MaaColors.softPurple, size: 48),
+                          const Icon(Icons.videocam_rounded,
+                              color: MaaColors.softPurple, size: 48),
                           const SizedBox(height: 8),
                           Text(
                             'Video selected ✅',
                             style: GoogleFonts.poppins(
-                              fontSize: 13, fontWeight: FontWeight.w600,
+                              fontSize: 13,
+                              fontWeight: FontWeight.w600,
                               color: MaaColors.softPurple,
                             ),
                           ),
@@ -1514,7 +1950,8 @@ class _NewPostSheetState extends State<_NewPostSheet> {
                             _mediaFile!.name.length > 30
                                 ? '...${_mediaFile!.name.substring(_mediaFile!.name.length - 28)}'
                                 : _mediaFile!.name,
-                            style: GoogleFonts.poppins(fontSize: 10, color: MaaColors.textMuted),
+                            style: GoogleFonts.poppins(
+                                fontSize: 10, color: MaaColors.textMuted),
                             textAlign: TextAlign.center,
                           ),
                         ],
@@ -1531,8 +1968,11 @@ class _NewPostSheetState extends State<_NewPostSheet> {
                       child: ClipRRect(
                         borderRadius: BorderRadius.circular(14),
                         child: _mediaBytes != null
-                            ? Image.memory(_mediaBytes!, fit: BoxFit.cover, width: 120, height: 120)
-                            : const Center(child: Icon(Icons.image_rounded, color: MaaColors.pink, size: 36)),
+                            ? Image.memory(_mediaBytes!,
+                                fit: BoxFit.cover, width: 120, height: 120)
+                            : const Center(
+                                child: Icon(Icons.image_rounded,
+                                    color: MaaColors.pink, size: 36)),
                       ),
                     ),
                   Positioned(
@@ -1547,10 +1987,16 @@ class _NewPostSheetState extends State<_NewPostSheet> {
                       child: Container(
                         padding: const EdgeInsets.all(5),
                         decoration: BoxDecoration(
-                          color: MaaColors.error, shape: BoxShape.circle,
-                          boxShadow: [BoxShadow(color: MaaColors.error.withAlpha(100), blurRadius: 6)],
+                          color: MaaColors.error,
+                          shape: BoxShape.circle,
+                          boxShadow: [
+                            BoxShadow(
+                                color: MaaColors.error.withAlpha(100),
+                                blurRadius: 6)
+                          ],
                         ),
-                        child: const Icon(Icons.close, color: MaaColors.white, size: 13),
+                        child: const Icon(Icons.close,
+                            color: MaaColors.white, size: 13),
                       ),
                     ),
                   ),
@@ -1566,7 +2012,8 @@ class _NewPostSheetState extends State<_NewPostSheet> {
                     color: MaaColors.pink.withAlpha(20),
                     borderRadius: BorderRadius.circular(12),
                   ),
-                  child: const Icon(Icons.image_outlined, color: MaaColors.pink, size: 20),
+                  child: const Icon(Icons.image_outlined,
+                      color: MaaColors.pink, size: 20),
                 ),
                 onPressed: () => _pickMedia(false),
                 tooltip: 'Add photo',
@@ -1578,7 +2025,8 @@ class _NewPostSheetState extends State<_NewPostSheet> {
                     color: MaaColors.softPurple.withAlpha(20),
                     borderRadius: BorderRadius.circular(12),
                   ),
-                  child: const Icon(Icons.videocam_outlined, color: MaaColors.softPurple, size: 20),
+                  child: const Icon(Icons.videocam_outlined,
+                      color: MaaColors.softPurple, size: 20),
                 ),
                 onPressed: () => _pickMedia(true),
                 tooltip: 'Add video',
@@ -1588,7 +2036,8 @@ class _NewPostSheetState extends State<_NewPostSheet> {
               GestureDetector(
                 onTap: () => setState(() => _anonymous = !_anonymous),
                 child: Container(
-                  padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 8),
+                  padding:
+                      const EdgeInsets.symmetric(horizontal: 12, vertical: 8),
                   decoration: BoxDecoration(
                     color: _anonymous
                         ? MaaColors.softPurple.withAlpha(30)
@@ -1629,7 +2078,9 @@ class _NewPostSheetState extends State<_NewPostSheet> {
             child: NeonButton(
               label: _uploading ? 'Uploading media... 📤' : 'Share Post 🌸',
               isLoading: _posting || _uploading,
-              onPressed: (_posting || _uploading || _controller.text.trim().isEmpty)
+              onPressed: (_posting ||
+                      _uploading ||
+                      _controller.text.trim().isEmpty)
                   ? null
                   : () async {
                       final navigator = Navigator.of(context);
@@ -1644,12 +2095,15 @@ class _NewPostSheetState extends State<_NewPostSheet> {
                         String? vidUrl;
 
                         if (_mediaFile != null) {
-                          final ext = _mediaFile!.name.split('.').last.toLowerCase();
-                          final fileName = '${_isVideo ? 'vid' : 'img'}_${DateTime.now().millisecondsSinceEpoch}.$ext';
-                          
+                          final ext =
+                              _mediaFile!.name.split('.').last.toLowerCase();
+                          final fileName =
+                              '${_isVideo ? 'vid' : 'img'}_${DateTime.now().millisecondsSinceEpoch}.$ext';
+
                           setState(() => _uploading = true);
-                          
-                          final commProvider = context.read<CommunityProvider>();
+
+                          final commProvider =
+                              context.read<CommunityProvider>();
                           Uint8List? uploadBytes;
                           if (_isVideo) {
                             uploadBytes = await _mediaFile!.readAsBytes();
@@ -1659,17 +2113,34 @@ class _NewPostSheetState extends State<_NewPostSheet> {
 
                           if (uploadBytes != null) {
                             try {
-                              final url = await commProvider.uploadMedia(fileName, uploadBytes);
-                              
+                              final url = await commProvider.uploadMedia(
+                                  fileName, uploadBytes);
                               if (_isVideo) {
-                                vidUrl = url ?? _videoBlobUrl;
+                                // Try server URL first, fallback to base64 for web persistence
+                                if (url != null &&
+                                    !url.contains('ui-avatars')) {
+                                  vidUrl = url;
+                                } else {
+                                  // Encode video as base64 data URI so it persists
+                                  final base64Str = base64Encode(uploadBytes);
+                                  final mime = ext == 'mp4'
+                                      ? 'video/mp4'
+                                      : ext == 'mov'
+                                          ? 'video/quicktime'
+                                          : ext == 'webm'
+                                              ? 'video/webm'
+                                              : 'video/mp4';
+                                  vidUrl = 'data:$mime;base64,$base64Str';
+                                }
                               } else {
                                 imgUrl = url;
                                 if (imgUrl == null && _mediaBytes != null) {
-                                  // Image fallback to base64
                                   final base64Str = base64Encode(_mediaBytes!);
-                                  final mimeType = ext == 'png' ? 'image/png'
-                                      : ext == 'gif' ? 'image/gif' : 'image/jpeg';
+                                  final mimeType = ext == 'png'
+                                      ? 'image/png'
+                                      : ext == 'gif'
+                                          ? 'image/gif'
+                                          : 'image/jpeg';
                                   imgUrl = 'data:$mimeType;base64,$base64Str';
                                 }
                               }
@@ -1687,13 +2158,15 @@ class _NewPostSheetState extends State<_NewPostSheet> {
                           imageUrl: imgUrl,
                           videoUrl: vidUrl,
                         );
-                        
+
                         if (mounted) navigator.pop();
                       } catch (e) {
                         debugPrint('Post submission error: $e');
                         if (mounted) {
                           messenger.showSnackBar(
-                            const SnackBar(content: Text('Error sharing post. Please try again.')),
+                            const SnackBar(
+                                content: Text(
+                                    'Error sharing post. Please try again.')),
                           );
                         }
                       } finally {
@@ -1714,32 +2187,39 @@ class _NewPostSheetState extends State<_NewPostSheet> {
 }
 
 // ═══════════════════════════════════════════════════════════════
-//  Video Player Widget - Optimized for Feed
+//  Video Player Widget - Web-Compatible
 // ═══════════════════════════════════════════════════════════════
 
-class _VideoPostPlayer extends StatefulWidget {
+class VideoPostPlayer extends StatefulWidget {
   final String url;
-  const _VideoPostPlayer({required this.url});
+  const VideoPostPlayer({super.key, required this.url});
 
   @override
-  State<_VideoPostPlayer> createState() => _VideoPostPlayerState();
+  State<VideoPostPlayer> createState() => _VideoPostPlayerState();
 }
 
-class _VideoPostPlayerState extends State<_VideoPostPlayer> {
+class _VideoPostPlayerState extends State<VideoPostPlayer> {
   late VideoPlayerController _controller;
   bool _initialized = false;
   bool _error = false;
+  bool _isDataUri = false;
 
   @override
   void initState() {
     super.initState();
+    _isDataUri =
+        widget.url.startsWith('data:') || widget.url.startsWith('blob:');
+
+    if (_isDataUri) {
+      // data: URIs — show a styled play card; video_player cannot handle these on web
+      // User can tap to open in new tab
+      setState(() => _error = false);
+      return;
+    }
+
     _controller = VideoPlayerController.networkUrl(Uri.parse(widget.url))
       ..initialize().then((_) {
-        if (mounted) {
-          setState(() {
-            _initialized = true;
-          });
-        }
+        if (mounted) setState(() => _initialized = true);
       }).catchError((e) {
         debugPrint('Video init error: $e');
         if (mounted) setState(() => _error = true);
@@ -1748,12 +2228,67 @@ class _VideoPostPlayerState extends State<_VideoPostPlayer> {
 
   @override
   void dispose() {
-    _controller.dispose();
+    if (!_isDataUri) _controller.dispose();
     super.dispose();
   }
 
   @override
   Widget build(BuildContext context) {
+    // For data:/blob: URIs — show a tappable video card
+    if (_isDataUri) {
+      return GestureDetector(
+        onTap: () async {
+          // Open blob/data URI in new browser tab on web
+          debugPrint('Video URL: ${widget.url.substring(0, 30)}...');
+          try {
+            await launchUrl(Uri.parse(widget.url), mode: LaunchMode.externalApplication);
+          } catch (_) {
+            debugPrint('Could not launch video URL');
+          }
+        },
+        child: Container(
+          height: 200,
+          width: double.infinity,
+          decoration: BoxDecoration(
+            borderRadius: BorderRadius.circular(16),
+            gradient: LinearGradient(
+              colors: [
+                MaaColors.softPurple.withAlpha(40),
+                MaaColors.cardLight,
+              ],
+              begin: Alignment.topLeft,
+              end: Alignment.bottomRight,
+            ),
+            border: Border.all(color: MaaColors.softPurple.withAlpha(60)),
+          ),
+          child: Column(
+            mainAxisAlignment: MainAxisAlignment.center,
+            children: [
+              Container(
+                padding: const EdgeInsets.all(18),
+                decoration: BoxDecoration(
+                  color: MaaColors.softPurple.withAlpha(30),
+                  shape: BoxShape.circle,
+                ),
+                child: const Icon(Icons.play_circle_fill_rounded,
+                    color: MaaColors.softPurple, size: 52),
+              ),
+              const SizedBox(height: 12),
+              Text('Video Post 🎬',
+                  style: GoogleFonts.poppins(
+                      fontSize: 14,
+                      fontWeight: FontWeight.w600,
+                      color: MaaColors.softPurple)),
+              const SizedBox(height: 4),
+              Text('Tap to play',
+                  style: GoogleFonts.poppins(
+                      fontSize: 11, color: MaaColors.textMuted)),
+            ],
+          ),
+        ),
+      );
+    }
+
     if (_error) {
       return Container(
         height: 200,
@@ -1765,9 +2300,11 @@ class _VideoPostPlayerState extends State<_VideoPostPlayer> {
           child: Column(
             mainAxisAlignment: MainAxisAlignment.center,
             children: [
-              Icon(Icons.video_camera_back_rounded, color: MaaColors.textMuted, size: 32),
+              Icon(Icons.video_camera_back_rounded,
+                  color: MaaColors.textMuted, size: 32),
               SizedBox(height: 8),
-              Text('Video unavailable', style: TextStyle(color: MaaColors.textMuted, fontSize: 12)),
+              Text('Video unavailable',
+                  style: TextStyle(color: MaaColors.textMuted, fontSize: 12)),
             ],
           ),
         ),
@@ -1782,7 +2319,8 @@ class _VideoPostPlayerState extends State<_VideoPostPlayer> {
           borderRadius: BorderRadius.circular(16),
         ),
         child: const Center(
-          child: CircularProgressIndicator(color: MaaColors.pink, strokeWidth: 2),
+          child:
+              CircularProgressIndicator(color: MaaColors.pink, strokeWidth: 2),
         ),
       );
     }
@@ -1799,7 +2337,9 @@ class _VideoPostPlayerState extends State<_VideoPostPlayer> {
           GestureDetector(
             onTap: () {
               setState(() {
-                _controller.value.isPlaying ? _controller.pause() : _controller.play();
+                _controller.value.isPlaying
+                    ? _controller.pause()
+                    : _controller.play();
               });
             },
             child: Container(
@@ -1813,16 +2353,17 @@ class _VideoPostPlayerState extends State<_VideoPostPlayer> {
                           decoration: BoxDecoration(
                             color: Colors.black45,
                             shape: BoxShape.circle,
-                            border: Border.all(color: MaaColors.white.withAlpha(50)),
+                            border: Border.all(
+                                color: MaaColors.white.withAlpha(50)),
                           ),
-                          child: const Icon(Icons.play_arrow_rounded, color: MaaColors.white, size: 40),
+                          child: const Icon(Icons.play_arrow_rounded,
+                              color: MaaColors.white, size: 40),
                         )
                       : const SizedBox.shrink(),
                 ),
               ),
             ),
           ),
-          // Mute status overlay
           Positioned(
             bottom: 8,
             right: 8,
@@ -1839,7 +2380,9 @@ class _VideoPostPlayerState extends State<_VideoPostPlayer> {
                   shape: BoxShape.circle,
                 ),
                 child: Icon(
-                  _controller.value.volume == 0 ? Icons.volume_off_rounded : Icons.volume_up_rounded,
+                  _controller.value.volume == 0
+                      ? Icons.volume_off_rounded
+                      : Icons.volume_up_rounded,
                   color: MaaColors.white,
                   size: 16,
                 ),

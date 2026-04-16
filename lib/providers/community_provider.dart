@@ -14,6 +14,7 @@ class CommunityProvider extends ChangeNotifier {
   bool _isLoading = false;
   String? _error;
   int? _weekFilter;
+  bool _isSubscribed = false;
 
   List<PostModel> get posts => _posts;
   List<UserModel> get suggestedMamas => _suggestedMamas;
@@ -21,35 +22,61 @@ class CommunityProvider extends ChangeNotifier {
   String? get error => _error;
   int? get weekFilter => _weekFilter;
 
-  Future<void> fetchPosts({int? weekTag}) async {
+  Future<void> fetchPosts({int? weekTag, int? limit}) async {
     _weekFilter = weekTag;
     _setLoading(true);
     try {
-      _posts = await InsForgeService.instance.fetchPosts(weekTag: weekTag);
-      _suggestedMamas = await InsForgeService.instance.fetchUsers(limit: 8);
-      _suggestedMamas.shuffle();
-      if (_suggestedMamas.length > 5) {
-         _suggestedMamas = _suggestedMamas.sublist(0, 5);
-      }
+      final results = await Future.wait([
+        InsForgeService.instance.fetchPosts(weekTag: weekTag, limit: limit ?? 50),
+        InsForgeService.instance.fetchUsers(limit: 50),
+      ]);
+      
+      _posts = results[0] as List<PostModel>;
+      _suggestedMamas = results[1] as List<UserModel>;
       _error = null;
 
-      InsForgeRealtimeClient.instance.subscribe('posts:all', (payload) {
-        if (payload['event'] == 'INSERT_post') {
-          final newPost = PostModel.fromMap(payload['record']);
-          if (!_posts.any((p) => p.id == newPost.id)) {
-             if (_weekFilter == null || _weekFilter == newPost.weekTag) {
-                 _posts.insert(0, newPost);
-                 notifyListeners();
-             }
-          }
-        }
-      });
+      _initializeRealtime();
       
     } catch (e) {
       _error = 'Could not load posts. Check your connection.';
     } finally {
       _setLoading(false);
     }
+  }
+
+  void _initializeRealtime() {
+    if (_isSubscribed) return;
+    _isSubscribed = true;
+
+    InsForgeRealtimeClient.instance.subscribe('posts:all', (payload) {
+      final String? eventType = payload['event'];
+      if (eventType == null) return;
+
+      // Handle both specific and generic event names
+      if (eventType == 'INSERT_post' || eventType == 'INSERT') {
+        final newPost = PostModel.fromMap(payload['record']);
+        if (!_posts.any((p) => p.id == newPost.id)) {
+          if (_weekFilter == null || _weekFilter == newPost.weekTag) {
+            _posts.insert(0, newPost);
+            notifyListeners();
+          }
+        }
+      } else if (eventType == 'UPDATE_post' || eventType == 'UPDATE') {
+        final updatedPost = PostModel.fromMap(payload['record']);
+        final index = _posts.indexWhere((p) => p.id == updatedPost.id);
+        if (index != -1) {
+          _posts[index] = updatedPost;
+          notifyListeners();
+        }
+      } else if (eventType == 'DELETE_post' || eventType == 'DELETE') {
+        final String? deletedId =
+            payload['old_record']?['id'] ?? payload['record']?['id'];
+        if (deletedId != null) {
+          _posts.removeWhere((p) => p.id == deletedId);
+          notifyListeners();
+        }
+      }
+    });
   }
 
   Future<String?> uploadMedia(String fileName, List<int> bytes, {String bucket = 'community_media'}) async {

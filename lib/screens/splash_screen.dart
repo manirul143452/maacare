@@ -7,10 +7,11 @@ import 'package:flutter/material.dart';
 import 'package:provider/provider.dart';
 import 'package:shared_preferences/shared_preferences.dart';
 import 'package:flutter_animate/flutter_animate.dart';
-import '../../app_theme.dart';
-import '../../providers/user_provider.dart';
-import '../../services/insforge_service.dart';
-import '../../services/notification_service.dart';
+import '../app_theme.dart';
+import '../providers/user_provider.dart';
+import '../services/auth_service.dart';
+import '../services/notification_service.dart';
+import '../services/push_notification_service.dart';
 import 'legal/privacy_policy_screen.dart';
 import 'legal/terms_conditions_screen.dart';
 
@@ -33,6 +34,7 @@ class _SplashScreenState extends State<SplashScreen>
   @override
   void initState() {
     super.initState();
+    debugPrint('MAACARE_DEBUG: SplashScreen.initState');
     _pulseController = AnimationController(
       duration: const Duration(milliseconds: 1200),
       vsync: this,
@@ -50,13 +52,29 @@ class _SplashScreenState extends State<SplashScreen>
   }
 
   Future<void> _loadState() async {
-    try {
-      await InsForgeService.instance.loadSession();
-    } catch (_) {}
+    debugPrint('MAACARE_DEBUG: _loadState starting');
     
+    // Initialize Auth Service (SecureStorage, Auto-refresh)
     try {
-      await NotificationService.instance.initialize();
-    } catch (_) {}
+      await AuthService.instance.initialize().timeout(const Duration(seconds: 5), onTimeout: () {
+        debugPrint('MAACARE_DEBUG: AuthService init timed out after 5s');
+      });
+      debugPrint('MAACARE_DEBUG: AuthService initialized');
+    } catch (e) {
+      debugPrint('MAACARE_DEBUG: AuthService init error: $e');
+    }
+    
+    // Initialize Notifications
+    try {
+      await NotificationService.instance.initialize().timeout(
+        const Duration(seconds: 5),
+        onTimeout: () {
+          debugPrint('MAACARE_DEBUG: NotificationService init timed out after 5s');
+        },
+      );
+    } catch (e) {
+      debugPrint('MAACARE_DEBUG: NotificationService init error: $e');
+    }
 
     final prefs = await SharedPreferences.getInstance();
     final onboardingDone = prefs.getBool('onboarding_complete') ?? false;
@@ -93,6 +111,7 @@ class _SplashScreenState extends State<SplashScreen>
     final userProvider = context.read<UserProvider>();
     final legalAccepted = prefs.getBool('legal_accepted') ?? false;
 
+    // Check legal acceptance first
     if (!legalAccepted) {
       if (!mounted) return;
       Navigator.pushReplacement(
@@ -133,11 +152,35 @@ class _SplashScreenState extends State<SplashScreen>
       return;
     }
 
-    if (onboardingDone) {
-      await userProvider.loadUser();
+    // Use AuthService to check authentication status
+    final isAuthenticated = AuthService.instance.isLoggedIn;
+    final userId = AuthService.instance.getCurrentUserId();
+
+    debugPrint('MAACARE_DEBUG: Auth status - isAuthenticated: $isAuthenticated, userId: $userId');
+
+    if (!isAuthenticated || userId == null) {
+      debugPrint('MAACARE_DEBUG: Not authenticated, navigating to auth');
+      if (!mounted) return;
+      Navigator.pushReplacementNamed(context, '/auth');
+    } else if (onboardingDone) {
+      debugPrint('MAACARE_DEBUG: Onboarding done, loading user');
+      try {
+        await userProvider.loadUser().timeout(const Duration(seconds: 5), onTimeout: () {
+          debugPrint('MAACARE_DEBUG: loadUser timed out after 5s');
+        });
+        debugPrint('MAACARE_DEBUG: User loaded, navigating to home');
+        
+        // Sync OneSignal Player ID to backend for push notifications
+        debugPrint('MAACARE_DEBUG: Syncing OneSignal token...');
+        await PushNotificationService.instance.syncPlayerIdToBackend(userId);
+      } catch (e) {
+        debugPrint('MAACARE_DEBUG: Error loading user details: $e');
+      }
       if (!mounted) return;
       Navigator.pushReplacementNamed(context, '/home');
     } else {
+      debugPrint('MAACARE_DEBUG: Onboarding not done, navigating to onboarding');
+      if (!mounted) return;
       Navigator.pushReplacementNamed(context, '/onboarding');
     }
   }

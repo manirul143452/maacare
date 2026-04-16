@@ -281,7 +281,7 @@ class InsForgeService {
   // ─────────────────── User Profile ───────────────────
 
   Future<void> upsertUser(UserModel user) async {
-    final url = Uri.parse('$_baseUrl/api/database/records/users');
+    final url = Uri.parse('$_baseUrl/api/database/records/users?on_conflict=id');
     final response = await http.post(
       url,
       headers: {
@@ -408,9 +408,9 @@ class InsForgeService {
 
   // ─────────────────── Community Posts ───────────────────
 
-  Future<List<PostModel>> fetchPosts({int? weekTag}) async {
+  Future<List<PostModel>> fetchPosts({int? weekTag, int? limit}) async {
     var urlStr =
-        '$_baseUrl/api/database/records/posts?order=created_at.desc&limit=50';
+        '$_baseUrl/api/database/records/posts?order=created_at.desc&limit=${limit ?? 50}';
     if (weekTag != null) {
       urlStr += '&week_tag=eq.$weekTag';
     }
@@ -440,8 +440,38 @@ class InsForgeService {
       if (data.isNotEmpty) {
         return PostModel.fromMap(data.first);
       }
+    } else {
+      debugPrint('Post creation failed: ${response.statusCode} - ${response.body}');
     }
     return null;
+  }
+
+  Future<List<PostModel>> fetchPostsByUser(String userId) async {
+    final url = Uri.parse(
+        '$_baseUrl/api/database/records/posts?user_id=eq.$userId&order=created_at.desc');
+    try {
+      final response = await http.get(url, headers: _headers);
+      if (response.statusCode == 200) {
+        final List data = jsonDecode(response.body);
+        return data.map((p) => PostModel.fromMap(p)).toList();
+      }
+    } catch (e) {
+      debugPrint('fetchPostsByUser error: $e');
+    }
+    return [];
+  }
+
+  Future<bool> deletePost(String postId) async {
+    final url = Uri.parse('$_baseUrl/api/database/records/posts?id=eq.$postId');
+    try {
+      final response = await http.delete(url, headers: _headers);
+      return response.statusCode == 200 ||
+          response.statusCode == 204 ||
+          response.statusCode == 201;
+    } catch (e) {
+      debugPrint('deletePost error: $e');
+      return false;
+    }
   }
 
   Future<void> likePost(String postId, int currentLikes) async {

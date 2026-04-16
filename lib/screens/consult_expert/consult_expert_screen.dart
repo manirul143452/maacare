@@ -13,6 +13,7 @@ import 'package:provider/provider.dart';
 import 'package:flutter_animate/flutter_animate.dart';
 import '../../providers/user_provider.dart';
 import 'doctor_profile_screen.dart';
+import '../../l10n/app_localizations.dart';
 
 class ConsultExpertScreen extends StatefulWidget {
   const ConsultExpertScreen({super.key});
@@ -51,16 +52,25 @@ class _ConsultExpertScreenState extends State<ConsultExpertScreen> {
   @override
   Widget build(BuildContext context) {
     return Scaffold(
+      backgroundColor: MaaColors.background,
       appBar: AppBar(
+        backgroundColor: MaaColors.cardDark,
+        elevation: 0,
         leading: IconButton(
-          icon: const Icon(Icons.arrow_back),
+          icon: const Icon(Icons.arrow_back, color: MaaColors.textPrimary),
           onPressed: () {
             // Force return to home screen (guarantees web routing works securely)
             Navigator.of(context)
                 .pushNamedAndRemoveUntil('/home', (route) => false);
           },
         ),
-        title: const Text('Consult Expert 👩‍⚕️'),
+        title: Text(
+          '${AppLocalizations.of(context).navConsult} 👩‍⚕️',
+          style: GoogleFonts.poppins(
+            color: MaaColors.textPrimary,
+            fontWeight: FontWeight.w600,
+          ),
+        ),
       ),
       body: PopScope(
         canPop: true,
@@ -95,7 +105,9 @@ class _ConsultExpertScreenState extends State<ConsultExpertScreen> {
                 ],
               ),
             ),
-            _buildDoctorCTA(context),
+            // Show doctor CTA only for logged-in users
+            if (context.read<UserProvider>().user != null)
+              _buildDoctorCTA(context),
             Expanded(
               child: FutureBuilder<List<DoctorModel>>(
                 future: _doctorsFuture,
@@ -108,21 +120,87 @@ class _ConsultExpertScreenState extends State<ConsultExpertScreen> {
 
                   if (snapshot.hasError) {
                     return Center(
-                      child: Text(
-                        'Database Connection Error:\n${snapshot.error}',
-                        style: const TextStyle(color: Colors.red),
-                        textAlign: TextAlign.center,
+                      child: Column(
+                        mainAxisAlignment: MainAxisAlignment.center,
+                        children: [
+                          const Icon(Icons.error_outline, color: MaaColors.error, size: 48),
+                          const SizedBox(height: 16),
+                          Text(
+                            'Unable to load doctors',
+                            style: GoogleFonts.poppins(
+                              color: MaaColors.textPrimary,
+                              fontSize: 18,
+                              fontWeight: FontWeight.w600,
+                            ),
+                          ),
+                          const SizedBox(height: 8),
+                          Text(
+                            '${snapshot.error}',
+                            style: GoogleFonts.poppins(
+                              color: MaaColors.textSecondary,
+                              fontSize: 12,
+                            ),
+                            textAlign: TextAlign.center,
+                          ),
+                          const SizedBox(height: 20),
+                          ElevatedButton.icon(
+                            onPressed: () {
+                              setState(() {
+                                _doctorsFuture = InsForgeService.instance.fetchDoctors();
+                              });
+                            },
+                            icon: const Icon(Icons.refresh),
+                            label: const Text('Retry'),
+                            style: ElevatedButton.styleFrom(
+                              backgroundColor: MaaColors.pink,
+                              foregroundColor: Colors.white,
+                            ),
+                          ),
+                        ],
                       ),
                     );
                   }
 
                   final doctors = snapshot.data ?? [];
                   if (doctors.isEmpty) {
-                    return const Center(
-                      child: Text(
-                        'No doctors found in Database.\n\nMake sure you submitted the Registration form without errors\nand that the Database Tables are properly set up!',
-                        style: TextStyle(color: MaaColors.white),
-                        textAlign: TextAlign.center,
+                    return Center(
+                      child: Column(
+                        mainAxisAlignment: MainAxisAlignment.center,
+                        children: [
+                          const Icon(Icons.local_hospital_outlined, color: MaaColors.textMuted, size: 64),
+                          const SizedBox(height: 16),
+                          Text(
+                            'No doctors available',
+                            style: GoogleFonts.poppins(
+                              color: MaaColors.textPrimary,
+                              fontSize: 18,
+                              fontWeight: FontWeight.w600,
+                            ),
+                          ),
+                          const SizedBox(height: 8),
+                          Text(
+                            'Doctors will appear here once they join.\nCheck back later!',
+                            style: GoogleFonts.poppins(
+                              color: MaaColors.textSecondary,
+                              fontSize: 14,
+                            ),
+                            textAlign: TextAlign.center,
+                          ),
+                          const SizedBox(height: 20),
+                          ElevatedButton.icon(
+                            onPressed: () {
+                              setState(() {
+                                _doctorsFuture = InsForgeService.instance.fetchDoctors();
+                              });
+                            },
+                            icon: const Icon(Icons.refresh),
+                            label: const Text('Refresh'),
+                            style: ElevatedButton.styleFrom(
+                              backgroundColor: MaaColors.pink,
+                              foregroundColor: Colors.white,
+                            ),
+                          ),
+                        ],
                       ),
                     );
                   }
@@ -255,14 +333,9 @@ class _DoctorCard extends StatelessWidget {
       child: Container(
         padding: const EdgeInsets.all(16),
         decoration: BoxDecoration(
-          color: MaaColors.white,
+          color: MaaColors.cardDark,
           borderRadius: BorderRadius.circular(20),
-          boxShadow: [
-            BoxShadow(
-                color: MaaColors.cardShadow,
-                blurRadius: 12,
-                offset: const Offset(0, 3))
-          ],
+          border: Border.all(color: MaaColors.glassBorder),
         ),
         child: Column(
           children: [
@@ -290,7 +363,7 @@ class _DoctorCard extends StatelessWidget {
                           Flexible(
                             child: Text(doctor.name,
                                 style: const TextStyle(
-                                    fontSize: 15, fontWeight: FontWeight.w700),
+                                    fontSize: 15, fontWeight: FontWeight.w700, color: MaaColors.textPrimary),
                                 overflow: TextOverflow.ellipsis),
                           ),
                           if (doctor.isVerified) ...[
@@ -302,17 +375,17 @@ class _DoctorCard extends StatelessWidget {
                       ),
                       Text(doctor.specialization,
                           style: const TextStyle(
-                              fontSize: 12, color: MaaColors.textGrey)),
+                              fontSize: 12, color: MaaColors.textSecondary)),
                       Row(
                         children: [
                           const Icon(Icons.star_rounded,
                               color: MaaColors.gold, size: 14),
                           Text(' ${doctor.rating}',
                               style: const TextStyle(
-                                  fontSize: 12, fontWeight: FontWeight.w600)),
+                                  fontSize: 12, fontWeight: FontWeight.w600, color: MaaColors.textPrimary)),
                           Text(' · ${doctor.experience} exp',
                               style: const TextStyle(
-                                  fontSize: 12, color: MaaColors.textGrey)),
+                                  fontSize: 12, color: MaaColors.textSecondary)),
                         ],
                       ),
                     ],

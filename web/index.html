@@ -1,5 +1,6 @@
 <!DOCTYPE html>
 <html>
+
 <head>
   <!--
     If you are serving your web app in a path other than the root, change the
@@ -17,6 +18,7 @@
   <base href="$FLUTTER_BASE_HREF">
 
   <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
   <meta content="IE=Edge" http-equiv="X-UA-Compatible">
   <meta name="description" content="MaaCare – Pregnancy & Motherhood Support App">
 
@@ -27,28 +29,118 @@
   <link rel="apple-touch-icon" href="assets/images/logo.png">
 
   <!-- Favicon -->
-  <link rel="icon" type="image/png" href="assets/images/logo.png"/>
+  <link rel="icon" type="image/png" href="assets/images/logo.png" />
 
   <title>MaaCare – You are never alone, Mama 💕</title>
   <link rel="manifest" href="manifest.json">
+
+  <style>
+    /* Prevent white flash before Flutter loads */
+    body {
+      margin: 0;
+      background-color: #0F0F1A;
+    }
+
+    /* Native splash shown while Flutter engine boots */
+    #flutter-loading {
+      position: fixed;
+      inset: 0;
+      display: flex;
+      flex-direction: column;
+      align-items: center;
+      justify-content: center;
+      background: linear-gradient(180deg, #0F0F1A 0%, #1A1A2E 100%);
+      z-index: 9999;
+      transition: opacity 0.4s ease;
+    }
+
+    #flutter-loading .logo-ring {
+      width: 100px;
+      height: 100px;
+      border-radius: 50%;
+      border: 2px solid rgba(255, 105, 180, 0.6);
+      background: white;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      box-shadow: 0 0 40px rgba(255, 105, 180, 0.4),
+        0 0 80px rgba(157, 78, 221, 0.2);
+      animation: pulse 1.4s ease-in-out infinite;
+    }
+
+    #flutter-loading .logo-ring span {
+      font-size: 48px;
+    }
+
+    #flutter-loading p {
+      margin-top: 28px;
+      color: rgba(255, 255, 255, 0.5);
+      font-family: sans-serif;
+      font-size: 13px;
+      letter-spacing: 2px;
+      text-transform: uppercase;
+    }
+
+    @keyframes pulse {
+
+      0%,
+      100% {
+        transform: scale(0.96);
+        box-shadow: 0 0 30px rgba(255, 105, 180, 0.3);
+      }
+
+      50% {
+        transform: scale(1.04);
+        box-shadow: 0 0 55px rgba(255, 105, 180, 0.6);
+      }
+    }
+  </style>
 </head>
+
 <body>
-  <script src="flutter.js" defer></script>
+
+  <!-- Native loading UI shown before Flutter engine is ready -->
+  <div id="flutter-loading">
+    <div class="logo-ring"><span>💕</span></div>
+    <p>Loading MaaCare…</p>
+  </div>
+
+  <script src="flutter_bootstrap.js" async></script>
   <script>
-    window.addEventListener('load', function(ev) {
-      // Download main.dart.js
-      _flutter.loader.loadEntrypoint({
-        serviceWorker: {
-          serviceWorkerVersion: null,
-        },
-        onEntrypointLoaded: function(engineInitializer) {
-          engineInitializer.initializeEngine().then(function(appRunner) {
-            appRunner.runApp();
-          });
-        }
-      });
+    function displayErrorVisual(message) {
+      console.error('Visual Error Caught:', message);
+      var loaderText = document.querySelector('#flutter-loading p');
+      if (loaderText) {
+        loaderText.innerHTML = '<span style="color:red;font-weight:bold;">ERROR:</span> ' + message;
+        loaderText.style.color = '#ffaa22';
+      }
+    }
+
+    window.addEventListener('error', function (e) {
+      displayErrorVisual(e.message || String(e));
+    });
+
+    window.addEventListener('unhandledrejection', function (event) {
+      displayErrorVisual(event.reason || 'Promise Rejection');
+    });
+
+    // Bootstrapping fallback for older flutter or debugging
+    window.addEventListener('load', function (ev) {
+      if (typeof _flutter === 'undefined') {
+        console.warn("flutter_bootstrap.js is handling it, or flutter.js is missing.");
+      }
+    });
+
+    // Hide the native loader once Flutter signals it is ready
+    window.addEventListener('flutter-first-frame', function () {
+      var loader = document.getElementById('flutter-loading');
+      if (loader) {
+        loader.style.opacity = '0';
+        setTimeout(function () { loader.remove(); }, 400);
+      }
     });
   </script>
+
   <!-- Razorpay Checkout -->
   <script src="https://checkout.razorpay.com/v1/checkout.js"></script>
   <script>
@@ -62,8 +154,7 @@
         description: description || 'Super Mom Premium Subscription',
         image: 'https://maacare.co/assets/images/logo.png',
         order_id: orderId || '',
-        handler: function(response) {
-          // Send success back to Flutter
+        handler: function (response) {
           if (window.razorpaySuccess) {
             window.razorpaySuccess(response.razorpay_payment_id);
           }
@@ -76,7 +167,7 @@
           color: '#E91E8C'
         },
         modal: {
-          ondismiss: function() {
+          ondismiss: function () {
             if (window.razorpayDismiss) {
               window.razorpayDismiss();
             }
@@ -84,7 +175,7 @@
         }
       };
       var rzp = new Razorpay(options);
-      rzp.on('payment.failed', function(response) {
+      rzp.on('payment.failed', function (response) {
         if (window.razorpayFailed) {
           window.razorpayFailed(response.error.description);
         }
@@ -93,4 +184,5 @@
     }
   </script>
 </body>
+
 </html>

@@ -13,10 +13,15 @@ import '../../constants.dart';
 import '../../models/user_model.dart';
 import 'dart:async';
 import '../../providers/user_provider.dart';
+import '../../providers/community_provider.dart';
 import '../../data/pregnancy_data.dart';
 import '../../services/notification_service.dart';
+import '../../services/push_notification_service.dart';
+import '../../services/auto_sync_service.dart';
 import '../../widgets/loading_overlay.dart';
 import '../../utils/error_helper.dart';
+import '../../l10n/app_localizations.dart';
+import '../community/parents_park_screen.dart';
 
 class HomeScreen extends StatefulWidget {
   const HomeScreen({super.key});
@@ -85,10 +90,24 @@ class _HomeScreenState extends State<HomeScreen> with TickerProviderStateMixin {
   }
 
   Future<void> _fetchData() async {
-    final provider = context.read<UserProvider>();
-    await provider.loadUser();
-    if (provider.error != null && mounted) {
-      ErrorHelper.showError(context, provider.error!);
+    final userProvider = context.read<UserProvider>();
+    final communityProvider = context.read<CommunityProvider>();
+    
+    await userProvider.loadUser();
+    
+    if (userProvider.error != null && mounted) {
+      ErrorHelper.showError(context, userProvider.error!);
+    }
+    
+    // Initialize auto-sync service with providers
+    if (!AutoSyncService.instance.isInitialized) {
+      await AutoSyncService.instance.initialize(
+        userProvider: userProvider,
+        communityProvider: communityProvider,
+      );
+      
+      // Enable background sync for notifications
+      await AutoSyncService.instance.enableBackgroundSync();
     }
   }
 
@@ -103,7 +122,7 @@ class _HomeScreenState extends State<HomeScreen> with TickerProviderStateMixin {
   @override
   Widget build(BuildContext context) {
     return Scaffold(
-      backgroundColor: MaaColors.background,
+      backgroundColor: Theme.of(context).scaffoldBackgroundColor,
       body: Stack(
         children: [
           // Particle background
@@ -197,26 +216,26 @@ class _HomeScreenState extends State<HomeScreen> with TickerProviderStateMixin {
             mainAxisAlignment: MainAxisAlignment.center,
             children: [
               const Icon(Icons.wifi_off_rounded,
-                  size: 64, color: MaaColors.textMuted),
+                  size: 64, color: Colors.grey),
               const SizedBox(height: 16),
               Text(
-                'Connection Lost',
+                AppLocalizations.of(context).connectionLost,
                 style: GoogleFonts.poppins(
                     fontSize: 20,
                     fontWeight: FontWeight.bold,
-                    color: MaaColors.white),
+                    color: Theme.of(context).colorScheme.onSurface),
               ),
               const SizedBox(height: 8),
               Text(
-                'We couldn\'t load your amazing dashboard. Let\'s try again.',
+                AppLocalizations.of(context).dashboardError,
                 textAlign: TextAlign.center,
-                style: GoogleFonts.poppins(color: MaaColors.textSecondary),
+                style: GoogleFonts.poppins(color: Theme.of(context).colorScheme.onSurface.withAlpha(180)),
               ),
               const SizedBox(height: 24),
               ElevatedButton.icon(
                 onPressed: _fetchData,
                 icon: const Icon(Icons.refresh),
-                label: const Text('Retry'),
+                label: Text(AppLocalizations.of(context).retry),
                 style: ElevatedButton.styleFrom(
                   backgroundColor: MaaColors.pink,
                   foregroundColor: MaaColors.white,
@@ -235,7 +254,7 @@ class _HomeScreenState extends State<HomeScreen> with TickerProviderStateMixin {
     return RefreshIndicator(
       onRefresh: _fetchData,
       color: MaaColors.pink,
-      backgroundColor: MaaColors.cardDark,
+      backgroundColor: Theme.of(context).cardTheme.color ?? MaaColors.cardDark,
       child: SingleChildScrollView(
         physics: const AlwaysScrollableScrollPhysics(),
         padding: const EdgeInsets.symmetric(horizontal: 20),
@@ -265,6 +284,8 @@ class _HomeScreenState extends State<HomeScreen> with TickerProviderStateMixin {
             const SizedBox(height: 20),
             _buildQuickActions(),
             const SizedBox(height: 20),
+            _buildLatestInParentsPark(),
+            const SizedBox(height: 20),
             _buildSocialProof(),
             const SizedBox(height: 100),
           ],
@@ -274,12 +295,13 @@ class _HomeScreenState extends State<HomeScreen> with TickerProviderStateMixin {
   }
 
   Widget _buildHeader(UserModel? user) {
+    final l10n = AppLocalizations.of(context);
     final hour = DateTime.now().hour;
     final greeting = hour < 12
-        ? 'Good morning'
+        ? l10n.goodMorning
         : hour < 17
-            ? 'Good afternoon'
-            : 'Good evening';
+            ? l10n.goodAfternoon
+            : l10n.goodEvening;
     return Row(
       mainAxisAlignment: MainAxisAlignment.spaceBetween,
       children: [
@@ -290,28 +312,31 @@ class _HomeScreenState extends State<HomeScreen> with TickerProviderStateMixin {
               '$greeting,',
               style: GoogleFonts.poppins(
                 fontSize: 14,
-                color: MaaColors.textSecondary,
+                color: Theme.of(context).colorScheme.onSurface.withAlpha(180),
                 fontWeight: FontWeight.w400,
               ),
             ).animate().fadeIn().moveX(begin: -20, end: 0),
             Text(
-              user?.name ?? 'Mama',
+              user?.name ?? l10n.mama,
               style: GoogleFonts.poppins(
                 fontSize: 26,
-                color: MaaColors.textPrimary,
+                color: Theme.of(context).colorScheme.onSurface,
                 fontWeight: FontWeight.w700,
               ),
             ).animate().fadeIn(delay: 100.ms).moveX(begin: -20, end: 0),
             Text(
-              'You\'re doing amazingly! ✨',
+              l10n.doingAmazingly,
               style: GoogleFonts.poppins(
                 fontSize: 13,
-                color: MaaColors.pink,
+                color: Theme.of(context).colorScheme.primary,
                 fontWeight: FontWeight.w500,
               ),
             ).animate().fadeIn(delay: 200.ms),
           ],
         ),
+        // Notification Bell with Badge
+        _buildNotificationBell(),
+        const SizedBox(width: 12),
         GestureDetector(
           onTap: () => Navigator.pushNamed(context, '/profile'),
           child: Container(
@@ -359,6 +384,79 @@ class _HomeScreenState extends State<HomeScreen> with TickerProviderStateMixin {
     );
   }
 
+  Widget _buildNotificationBell() {
+    return StreamBuilder<int>(
+      stream: PushNotificationService.instance.onBadgeCountChanged,
+      initialData: PushNotificationService.instance.unreadCount,
+      builder: (context, snapshot) {
+        final unreadCount = snapshot.data ?? 0;
+        
+        return GestureDetector(
+          onTap: () => Navigator.pushNamed(context, '/notifications'),
+          child: Container(
+            padding: const EdgeInsets.all(10),
+            decoration: BoxDecoration(
+              color: unreadCount > 0 
+                  ? MaaColors.pink.withAlpha(30) 
+                  : MaaColors.glassBackground,
+              borderRadius: BorderRadius.circular(14),
+              border: Border.all(
+                color: unreadCount > 0 
+                    ? MaaColors.pink.withAlpha(50) 
+                    : MaaColors.glassBorder,
+              ),
+            ),
+            child: Stack(
+              clipBehavior: Clip.none,
+              children: [
+                Icon(
+                  unreadCount > 0 
+                      ? Icons.notifications_active_rounded 
+                      : Icons.notifications_outlined,
+                  color: unreadCount > 0 ? MaaColors.pink : MaaColors.textMuted,
+                  size: 24,
+                ),
+                if (unreadCount > 0)
+                  Positioned(
+                    top: -6,
+                    right: -6,
+                    child: Container(
+                      padding: const EdgeInsets.all(4),
+                      decoration: BoxDecoration(
+                        gradient: MaaColors.primaryGradient,
+                        shape: BoxShape.circle,
+                        boxShadow: [
+                          BoxShadow(
+                            color: MaaColors.pink.withAlpha(60),
+                            blurRadius: 6,
+                            spreadRadius: 1,
+                          ),
+                        ],
+                      ),
+                      constraints: const BoxConstraints(
+                        minWidth: 18,
+                        minHeight: 18,
+                      ),
+                      child: Center(
+                        child: Text(
+                          unreadCount > 99 ? '99+' : unreadCount.toString(),
+                          style: GoogleFonts.poppins(
+                            color: Colors.white,
+                            fontSize: 10,
+                            fontWeight: FontWeight.w800,
+                          ),
+                        ),
+                      ),
+                    ),
+                  ),
+              ],
+            ),
+          ),
+        ).animate().scale(curve: Curves.elasticOut, duration: 600.ms);
+      },
+    );
+  }
+
   Widget _buildCuriosityTeaser() {
     final teasers = [
       '🔮 Unlock your baby\'s secret today?',
@@ -391,7 +489,7 @@ class _HomeScreenState extends State<HomeScreen> with TickerProviderStateMixin {
               teaser,
               style: GoogleFonts.poppins(
                 fontSize: 13,
-                color: MaaColors.textPrimary,
+                color: Theme.of(context).colorScheme.onSurface,
                 fontWeight: FontWeight.w500,
               ),
             ),
@@ -474,9 +572,9 @@ class _HomeScreenState extends State<HomeScreen> with TickerProviderStateMixin {
                               Border.all(color: MaaColors.white.withAlpha(50)),
                         ),
                         child: Text(
-                          'WEEK $week',
+                          '${AppLocalizations.of(context).week} $week',
                           style: GoogleFonts.poppins(
-                            color: MaaColors.white,
+                            color: Colors.white,
                             fontSize: 14,
                             fontWeight: FontWeight.w700,
                             letterSpacing: 1.2,
@@ -528,9 +626,9 @@ class _HomeScreenState extends State<HomeScreen> with TickerProviderStateMixin {
                   Row(
                     children: [
                       Text(
-                        'Size of a ${fruitData['fruit']} ',
+                        '${AppLocalizations.of(context).sizeOfA} ${fruitData['fruit']} ',
                         style: GoogleFonts.poppins(
-                          color: MaaColors.white.withAlpha(220),
+                          color: Colors.white.withAlpha(220),
                           fontSize: 14,
                           fontWeight: FontWeight.w500,
                         ),
@@ -590,9 +688,9 @@ class _HomeScreenState extends State<HomeScreen> with TickerProviderStateMixin {
                     mainAxisAlignment: MainAxisAlignment.spaceBetween,
                     children: [
                       Text(
-                        '${40 - week} weeks to meet! 🌟',
+                        '${40 - week} ${AppLocalizations.of(context).weeksToMeet}',
                         style: GoogleFonts.poppins(
-                          color: MaaColors.white.withAlpha(200),
+                          color: Colors.white.withAlpha(200),
                           fontSize: 12,
                           fontWeight: FontWeight.w600,
                         ),
@@ -603,17 +701,17 @@ class _HomeScreenState extends State<HomeScreen> with TickerProviderStateMixin {
                           padding: const EdgeInsets.symmetric(
                               horizontal: 12, vertical: 6),
                           decoration: BoxDecoration(
-                            color: MaaColors.white.withAlpha(20),
+                            color: Colors.white.withAlpha(20),
                             borderRadius: BorderRadius.circular(20),
                             border: Border.all(
-                                color: MaaColors.white.withAlpha(40)),
+                                color: Colors.white.withAlpha(40)),
                           ),
                           child: Row(
                             children: [
                               Text(
-                                'Guide ',
+                                '${AppLocalizations.of(context).guide} ',
                                 style: GoogleFonts.poppins(
-                                  color: MaaColors.white,
+                                  color: Colors.white,
                                   fontSize: 10,
                                   fontWeight: FontWeight.w700,
                                 ),
@@ -655,11 +753,11 @@ class _HomeScreenState extends State<HomeScreen> with TickerProviderStateMixin {
               ),
               const SizedBox(width: 12),
               Text(
-                'How are you feeling today?',
+                AppLocalizations.of(context).howFeelingToday,
                 style: GoogleFonts.poppins(
                   fontSize: 16,
                   fontWeight: FontWeight.w600,
-                  color: MaaColors.textPrimary,
+                  color: Theme.of(context).colorScheme.onSurface,
                 ),
               ),
             ],
@@ -672,7 +770,7 @@ class _HomeScreenState extends State<HomeScreen> with TickerProviderStateMixin {
               _confetti.play();
               if (mounted) {
                 ErrorHelper.showSuccess(
-                    context, 'Mood logged! You\'re amazing! +5 ⭐');
+                    context, AppLocalizations.of(context).moodLogged);
               }
             },
           ),
@@ -685,9 +783,9 @@ class _HomeScreenState extends State<HomeScreen> with TickerProviderStateMixin {
     return Container(
       padding: const EdgeInsets.all(20),
       decoration: BoxDecoration(
-        color: MaaColors.cardDark,
+        color: Theme.of(context).cardTheme.color,
         borderRadius: BorderRadius.circular(20),
-        border: Border.all(color: MaaColors.glassBorder),
+        border: Border.all(color: Theme.of(context).colorScheme.onSurface.withAlpha(20)),
         boxShadow: [
           BoxShadow(
             color: MaaColors.darkShadow,
@@ -722,18 +820,18 @@ class _HomeScreenState extends State<HomeScreen> with TickerProviderStateMixin {
                   crossAxisAlignment: CrossAxisAlignment.start,
                   children: [
                     Text(
-                      'Health Support',
+                      AppLocalizations.of(context).healthSupport,
                       style: GoogleFonts.poppins(
                         fontSize: 16,
                         fontWeight: FontWeight.w600,
-                        color: MaaColors.textPrimary,
+                        color: Theme.of(context).colorScheme.onSurface,
                       ),
                     ),
                     Text(
-                      'Track symptoms, get expert help',
+                      AppLocalizations.of(context).trackSymptomsHelp,
                       style: GoogleFonts.poppins(
                         fontSize: 12,
-                        color: MaaColors.textSecondary,
+                        color: Theme.of(context).colorScheme.onSurface.withAlpha(180),
                       ),
                     ),
                   ],
@@ -773,10 +871,10 @@ class _HomeScreenState extends State<HomeScreen> with TickerProviderStateMixin {
                     crossAxisAlignment: CrossAxisAlignment.start,
                     children: [
                       Text(
-                        'Your Health Score',
+                        AppLocalizations.of(context).yourHealthScore,
                         style: GoogleFonts.poppins(
                           fontSize: 13,
-                          color: MaaColors.textSecondary,
+                          color: Theme.of(context).colorScheme.onSurface.withAlpha(180),
                         ),
                       ),
                       const SizedBox(height: 6),
@@ -983,12 +1081,15 @@ class _HomeScreenState extends State<HomeScreen> with TickerProviderStateMixin {
 
   Widget _buildQuickActions() {
     final actions = [
-      const _QuickAction('💬', 'Maa AI', '/chat', MaaColors.pink),
-      const _QuickAction('📊', 'Tracker', '/tracker', MaaColors.softPurple),
-      const _QuickAction('🩺', 'Symptoms', '/symptoms', MaaColors.warning),
-      const _QuickAction('🧘', 'Self Care', '/selfcare', MaaColors.softGreen),
-      const _QuickAction('🍱', 'Nutrition', '/nutrition', MaaColors.lightBlue),
-      const _QuickAction('💉', 'Vaccines', '/vaccinations', MaaColors.peach),
+      const _QuickAction(Icons.chat_bubble_rounded, 'Maa AI', '/chat', MaaColors.pink, Icons.chat_bubble_outline),
+      const _QuickAction(Icons.track_changes_rounded, 'Tracker', '/tracker', MaaColors.softPurple, Icons.track_changes_outlined),
+      const _QuickAction(Icons.healing_rounded, 'Symptoms', '/symptoms', MaaColors.warning, Icons.healing_outlined),
+      const _QuickAction(Icons.spa_rounded, 'Self Care', '/selfcare', MaaColors.softGreen, Icons.spa_outlined),
+      const _QuickAction(Icons.restaurant_menu_rounded, 'Nutrition', '/nutrition', MaaColors.lightBlue, Icons.restaurant_menu_outlined),
+      const _QuickAction(Icons.vaccines_rounded, 'Vaccines', '/vaccinations', MaaColors.peach, Icons.vaccines_outlined),
+      const _QuickAction(Icons.menu_book_rounded, 'Care Guide', '/guide', MaaColors.gold, Icons.menu_book_outlined),
+      const _QuickAction(Icons.shield_rounded, 'Contraception', '/contraception', Color(0xFF7C4DFF), Icons.shield_outlined),
+      const _QuickAction(Icons.family_restroom_rounded, 'Planning', '/planning', MaaColors.softGreen, Icons.family_restroom_outlined),
     ];
 
     return Column(
@@ -1018,36 +1119,58 @@ class _HomeScreenState extends State<HomeScreen> with TickerProviderStateMixin {
               child: Container(
                 decoration: BoxDecoration(
                   color: MaaColors.cardDark,
-                  borderRadius: BorderRadius.circular(18),
-                  border: Border.all(color: a.color.withAlpha(30)),
+                  borderRadius: BorderRadius.circular(20),
+                  border: Border.all(color: a.color.withAlpha(40)),
                   boxShadow: [
                     BoxShadow(
-                      color: MaaColors.darkShadow,
-                      blurRadius: 10,
-                      offset: const Offset(0, 3),
+                      color: a.color.withAlpha(30),
+                      blurRadius: 12,
+                      offset: const Offset(0, 4),
                     ),
                   ],
                 ),
                 child: Column(
                   mainAxisAlignment: MainAxisAlignment.center,
                   children: [
+                    // Premium Gradient Icon Container
                     Container(
-                      padding: const EdgeInsets.all(10),
+                      width: 52,
+                      height: 52,
                       decoration: BoxDecoration(
-                        color: a.color.withAlpha(20),
-                        borderRadius: BorderRadius.circular(12),
+                        gradient: LinearGradient(
+                          begin: Alignment.topLeft,
+                          end: Alignment.bottomRight,
+                          colors: [
+                            a.color.withAlpha(180),
+                            a.color.withAlpha(80),
+                          ],
+                        ),
+                        borderRadius: BorderRadius.circular(16),
+                        boxShadow: [
+                          BoxShadow(
+                            color: a.color.withAlpha(60),
+                            blurRadius: 8,
+                            offset: const Offset(0, 3),
+                          ),
+                        ],
                       ),
-                      child:
-                          Text(a.emoji, style: const TextStyle(fontSize: 24)),
+                      child: Center(
+                        child: Icon(
+                          a.icon,
+                          color: Colors.white,
+                          size: 26,
+                        ),
+                      ),
                     ),
-                    const SizedBox(height: 8),
+                    const SizedBox(height: 10),
                     Text(
                       a.label,
                       textAlign: TextAlign.center,
                       style: GoogleFonts.poppins(
-                        fontSize: 11,
-                        fontWeight: FontWeight.w500,
+                        fontSize: 12,
+                        fontWeight: FontWeight.w600,
                         color: MaaColors.textPrimary,
+                        letterSpacing: 0.3,
                       ),
                     ),
                   ],
@@ -1109,7 +1232,7 @@ class _HomeScreenState extends State<HomeScreen> with TickerProviderStateMixin {
   Widget _buildBottomNav() {
     return Container(
       decoration: BoxDecoration(
-        color: MaaColors.cardDark,
+        color: Theme.of(context).cardTheme.color ?? MaaColors.cardDark,
         boxShadow: [
           BoxShadow(
             color: MaaColors.darkShadow,
@@ -1135,7 +1258,15 @@ class _HomeScreenState extends State<HomeScreen> with TickerProviderStateMixin {
             .map<NavigationDestination>((item) => NavigationDestination(
                   icon: Icon(item.icon, color: MaaColors.textMuted),
                   selectedIcon: Icon(item.icon, color: MaaColors.pink),
-                  label: item.label,
+                  label: () {
+                    switch(item.label) {
+                      case 'Home': return AppLocalizations.of(context).navHome;
+                      case 'Tracker': return AppLocalizations.of(context).navTracker;
+                      case 'Park': return AppLocalizations.of(context).navCommunity;
+                      case 'Me': return AppLocalizations.of(context).navProfile;
+                      default: return item.label;
+                    }
+                  }(),
                 ))
             .toList(),
       ),
@@ -1205,6 +1336,380 @@ class _HomeScreenState extends State<HomeScreen> with TickerProviderStateMixin {
       ),
     );
   }
+
+  Widget _buildLatestInParentsPark() {
+    return Consumer<CommunityProvider>(
+      builder: (context, provider, _) {
+        // Auto-fetch posts when widget builds (if not already loading)
+        if (!provider.isLoading && provider.posts.isEmpty && provider.error == null) {
+          WidgetsBinding.instance.addPostFrameCallback((_) {
+            provider.fetchPosts(limit: 5);
+          });
+        }
+
+        final posts = provider.posts.take(5).toList();
+        
+        // Fallback content if no posts yet
+        final displayItems = posts.isEmpty 
+          ? _getFallbackPosts()
+          : posts.map((p) => _PostDisplayItem(
+              id: p.id,
+              text: p.content,
+              imageUrl: p.imageUrl,
+              likes: p.likes,
+              authorName: p.anonymous ? 'Anonymous Mama' : (p.authorName ?? 'Mama'),
+              weekTag: p.weekTag,
+            )).toList();
+
+        return Column(
+          crossAxisAlignment: CrossAxisAlignment.start,
+          children: [
+            Row(
+              mainAxisAlignment: MainAxisAlignment.spaceBetween,
+              children: [
+                Row(
+                  children: [
+                    Container(
+                      padding: const EdgeInsets.all(8),
+                      decoration: BoxDecoration(
+                        gradient: LinearGradient(
+                          colors: [MaaColors.pink.withAlpha(150), MaaColors.softPurple.withAlpha(100)],
+                        ),
+                        borderRadius: BorderRadius.circular(12),
+                      ),
+                      child: const Icon(Icons.favorite_rounded, color: Colors.white, size: 18),
+                    ),
+                    const SizedBox(width: 12),
+                    Text(
+                      'Latest in Parents Park',
+                      style: GoogleFonts.poppins(
+                        fontSize: 18,
+                        fontWeight: FontWeight.w700,
+                        color: Theme.of(context).colorScheme.onSurface,
+                      ),
+                    ),
+                  ],
+                ),
+                TextButton.icon(
+                  onPressed: () {
+                    Navigator.push(
+                      context,
+                      MaterialPageRoute(builder: (_) => const ParentsParkScreen()),
+                    );
+                  },
+                  icon: const Icon(Icons.arrow_forward_rounded, size: 16),
+                  label: Text('View All', style: GoogleFonts.poppins(color: MaaColors.pink, fontWeight: FontWeight.w600)),
+                )
+              ],
+            ),
+            const SizedBox(height: 16),
+            
+            // Live indicator when using real data
+            if (posts.isNotEmpty)
+              Container(
+                margin: const EdgeInsets.only(bottom: 12),
+                padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 6),
+                decoration: BoxDecoration(
+                  color: MaaColors.success.withAlpha(20),
+                  borderRadius: BorderRadius.circular(20),
+                  border: Border.all(color: MaaColors.success.withAlpha(50)),
+                ),
+                child: Row(
+                  mainAxisSize: MainAxisSize.min,
+                  children: [
+                    Container(
+                      width: 8,
+                      height: 8,
+                      decoration: BoxDecoration(
+                        color: MaaColors.success,
+                        shape: BoxShape.circle,
+                        boxShadow: [
+                          BoxShadow(color: MaaColors.success.withAlpha(150), blurRadius: 6, spreadRadius: 1),
+                        ],
+                      ),
+                    ).animate(onPlay: (c) => c.repeat()).scale(begin: const Offset(1, 1), end: const Offset(1.3, 1.3), duration: 1000.ms),
+                    const SizedBox(width: 8),
+                    Text(
+                      'Live Updates',
+                      style: GoogleFonts.poppins(
+                        fontSize: 11,
+                        fontWeight: FontWeight.w600,
+                        color: MaaColors.success,
+                      ),
+                    ),
+                  ],
+                ),
+              ),
+            
+            SizedBox(
+              height: 180,
+              child: ListView.builder(
+                scrollDirection: Axis.horizontal,
+                physics: const BouncingScrollPhysics(),
+                itemCount: displayItems.length,
+                itemBuilder: (context, index) {
+                  final item = displayItems[index];
+                  return _buildParentsParkCard(item, index);
+                },
+              ),
+            ),
+          ],
+        );
+      },
+    );
+  }
+
+  List<_PostDisplayItem> _getFallbackPosts() {
+    return [
+      _PostDisplayItem(
+        id: '1',
+        text: 'How to handle teething? Looking for tips from experienced mamas 💕',
+        imageUrl: null,
+        likes: 24,
+        authorName: 'Priya M.',
+        weekTag: 16,
+      ),
+      _PostDisplayItem(
+        id: '2',
+        text: 'Nursery room ideas that saved my sanity! 🌸',
+        imageUrl: null,
+        likes: 89,
+        authorName: 'Anonymous Mama',
+        weekTag: 24,
+      ),
+      _PostDisplayItem(
+        id: '3',
+        text: 'My 20-week scan experience - everything you need to know! 👶',
+        imageUrl: null,
+        likes: 156,
+        authorName: 'Sarah K.',
+        weekTag: 20,
+      ),
+      _PostDisplayItem(
+        id: '4',
+        text: 'Best pregnancy yoga routines for beginners 🧘‍♀️',
+        imageUrl: null,
+        likes: 42,
+        authorName: 'Anonymous Mama',
+        weekTag: 12,
+      ),
+    ];
+  }
+
+  Widget _buildParentsParkCard(_PostDisplayItem post, int index) {
+    return GestureDetector(
+      onTap: () {
+        Navigator.push(
+          context,
+          MaterialPageRoute(builder: (_) => const ParentsParkScreen()),
+        );
+      },
+      child: Container(
+        width: 160,
+        margin: const EdgeInsets.only(right: 16),
+        decoration: BoxDecoration(
+          gradient: LinearGradient(
+            begin: Alignment.topCenter,
+            end: Alignment.bottomCenter,
+            colors: [
+              MaaColors.cardDark,
+              MaaColors.cardDark.withAlpha(200),
+            ],
+          ),
+          borderRadius: BorderRadius.circular(20),
+          border: Border.all(color: MaaColors.pink.withAlpha(30)),
+          boxShadow: [
+            BoxShadow(
+              color: MaaColors.darkShadow,
+              blurRadius: 15,
+              offset: const Offset(0, 6),
+            ),
+          ],
+        ),
+        child: ClipRRect(
+          borderRadius: BorderRadius.circular(20),
+          child: Stack(
+            children: [
+              Column(
+                crossAxisAlignment: CrossAxisAlignment.start,
+                children: [
+                  // Header with author
+                  Container(
+                    padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 10),
+                    decoration: BoxDecoration(
+                      gradient: LinearGradient(
+                        colors: [
+                          MaaColors.pink.withAlpha(40),
+                          MaaColors.softPurple.withAlpha(20),
+                        ],
+                      ),
+                    ),
+                    child: Row(
+                      children: [
+                        Container(
+                          width: 28,
+                          height: 28,
+                          decoration: const BoxDecoration(
+                            gradient: MaaColors.primaryGradient,
+                            shape: BoxShape.circle,
+                          ),
+                          child: Center(
+                            child: Text(
+                              post.authorName[0].toUpperCase(),
+                              style: GoogleFonts.poppins(
+                                color: Colors.white,
+                                fontSize: 12,
+                                fontWeight: FontWeight.bold,
+                              ),
+                            ),
+                          ),
+                        ),
+                        const SizedBox(width: 8),
+                        Expanded(
+                          child: Text(
+                            post.authorName,
+                            style: GoogleFonts.poppins(
+                              fontSize: 11,
+                              fontWeight: FontWeight.w600,
+                              color: MaaColors.textPrimary,
+                            ),
+                            overflow: TextOverflow.ellipsis,
+                          ),
+                        ),
+                      ],
+                    ),
+                  ),
+                  
+                  // Content
+                  Expanded(
+                    child: Padding(
+                      padding: const EdgeInsets.all(12),
+                      child: Text(
+                        post.text,
+                        maxLines: 3,
+                        overflow: TextOverflow.ellipsis,
+                        style: GoogleFonts.poppins(
+                          fontSize: 12,
+                          fontWeight: FontWeight.w500,
+                          color: MaaColors.textPrimary,
+                          height: 1.4,
+                        ),
+                      ),
+                    ),
+                  ),
+                  
+                  // Footer with likes and week tag
+                  Padding(
+                    padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 10),
+                    child: Row(
+                      mainAxisAlignment: MainAxisAlignment.spaceBetween,
+                      children: [
+                        Container(
+                          padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 4),
+                          decoration: BoxDecoration(
+                            color: MaaColors.pink.withAlpha(20),
+                            borderRadius: BorderRadius.circular(10),
+                          ),
+                          child: Row(
+                            mainAxisSize: MainAxisSize.min,
+                            children: [
+                              const Icon(Icons.favorite_rounded, color: MaaColors.pink, size: 12),
+                              const SizedBox(width: 4),
+                              Text(
+                                '${post.likes}',
+                                style: GoogleFonts.poppins(
+                                  fontSize: 10,
+                                  fontWeight: FontWeight.w600,
+                                  color: MaaColors.pink,
+                                ),
+                              ),
+                            ],
+                          ),
+                        ),
+                        if (post.weekTag > 0)
+                          Container(
+                            padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 4),
+                            decoration: BoxDecoration(
+                              color: MaaColors.softPurple.withAlpha(20),
+                              borderRadius: BorderRadius.circular(10),
+                            ),
+                            child: Text(
+                              'Week ${post.weekTag}',
+                              style: GoogleFonts.poppins(
+                                fontSize: 9,
+                                fontWeight: FontWeight.w600,
+                                color: MaaColors.softPurple,
+                              ),
+                            ),
+                          ),
+                      ],
+                    ),
+                  ),
+                ],
+              ),
+              
+              // "Read More" overlay at bottom
+              Positioned(
+                bottom: 0,
+                left: 0,
+                right: 0,
+                child: Container(
+                  padding: const EdgeInsets.symmetric(vertical: 6),
+                  decoration: BoxDecoration(
+                    gradient: LinearGradient(
+                      begin: Alignment.bottomCenter,
+                      end: Alignment.topCenter,
+                      colors: [
+                        MaaColors.cardDark,
+                        MaaColors.cardDark.withAlpha(0),
+                      ],
+                    ),
+                  ),
+                  child: Center(
+                    child: Container(
+                      padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 4),
+                      decoration: BoxDecoration(
+                        color: MaaColors.pink.withAlpha(30),
+                        borderRadius: BorderRadius.circular(12),
+                        border: Border.all(color: MaaColors.pink.withAlpha(50)),
+                      ),
+                      child: Text(
+                        'Read More',
+                        style: GoogleFonts.poppins(
+                          fontSize: 10,
+                          fontWeight: FontWeight.w600,
+                          color: MaaColors.pink,
+                        ),
+                      ),
+                    ),
+                  ),
+                ),
+              ),
+            ],
+          ),
+        ),
+      ).animate().fadeIn(delay: (100 * index).ms).slideX(begin: 0.1, end: 0),
+    );
+  }
+}
+
+// Helper class for displaying posts
+class _PostDisplayItem {
+  final String id;
+  final String text;
+  final String? imageUrl;
+  final int likes;
+  final String authorName;
+  final int weekTag;
+
+  _PostDisplayItem({
+    required this.id,
+    required this.text,
+    this.imageUrl,
+    required this.likes,
+    required this.authorName,
+    required this.weekTag,
+  });
 }
 
 class _NavItem {
@@ -1216,9 +1721,10 @@ class _NavItem {
 }
 
 class _QuickAction {
-  final String emoji;
+  final IconData icon;
   final String label;
   final String route;
   final Color color;
-  const _QuickAction(this.emoji, this.label, this.route, this.color);
+  final IconData? outlinedIcon;
+  const _QuickAction(this.icon, this.label, this.route, this.color, [this.outlinedIcon]);
 }

@@ -2,6 +2,7 @@
 //  Pregnancy Tracker Screen – MaaCare
 // ============================================================
 
+import 'dart:async';
 import 'package:flutter/material.dart';
 import 'package:provider/provider.dart';
 import 'package:flutter_animate/flutter_animate.dart';
@@ -14,6 +15,7 @@ import '../../providers/user_provider.dart';
 import '../../widgets/loading_overlay.dart';
 import '../../utils/error_helper.dart';
 import 'weekly_detail_screen.dart';
+import '../../l10n/app_localizations.dart';
 
 class PregnancyTrackerScreen extends StatefulWidget {
   const PregnancyTrackerScreen({super.key});
@@ -32,6 +34,41 @@ class _PregnancyTrackerScreenState extends State<PregnancyTrackerScreen> {
     '📖 Read a chapter / journaling': false,
   };
 
+  Timer? _midnightTimer;
+
+  @override
+  void initState() {
+    super.initState();
+    _setupMidnightTimer();
+    // Delay slightly to ensure provider is ready
+    WidgetsBinding.instance.addPostFrameCallback((_) {
+      _fetchData();
+    });
+  }
+
+  void _setupMidnightTimer() {
+    final now = DateTime.now();
+    final nextMidnight = DateTime(now.year, now.month, now.day + 1);
+    final durationToMidnight = nextMidnight.difference(now);
+
+    _midnightTimer = Timer(durationToMidnight, () {
+      if (mounted) {
+        setState(() {}); // Force chronological recalculation of week
+        // Set up the next cycle for subsequent days
+        _setupMidnightTimer(); 
+        ScaffoldMessenger.of(context).showSnackBar(
+          const SnackBar(content: Text('🌸 A new day! Your pregnancy milestones have updated. 👶')),
+        );
+      }
+    });
+  }
+
+  @override
+  void dispose() {
+    _midnightTimer?.cancel();
+    super.dispose();
+  }
+
   Future<void> _fetchData() async {
     final provider = context.read<UserProvider>();
     await provider.loadUser();
@@ -43,7 +80,7 @@ class _PregnancyTrackerScreenState extends State<PregnancyTrackerScreen> {
   @override
   Widget build(BuildContext context) {
     return Scaffold(
-      appBar: AppBar(title: const Text('Pregnancy Tracker 🤰')),
+      appBar: AppBar(title: Text('${AppLocalizations.of(context).navTracker} 🤰')),
       body: PopScope(
         canPop: true,
         onPopInvokedWithResult: (didPop, result) {
@@ -86,7 +123,7 @@ class _PregnancyTrackerScreenState extends State<PregnancyTrackerScreen> {
                   : RefreshIndicator(
                       onRefresh: _fetchData,
                       color: MaaColors.pink,
-                      backgroundColor: MaaColors.cardDark,
+                      backgroundColor: Theme.of(context).cardTheme.color ?? MaaColors.cardDark,
                       child: SingleChildScrollView(
                         padding: const EdgeInsets.all(20),
                         physics: const AlwaysScrollableScrollPhysics(),
@@ -318,8 +355,7 @@ class _PregnancyTrackerScreenState extends State<PregnancyTrackerScreen> {
             margin: const EdgeInsets.only(bottom: 12),
             padding: const EdgeInsets.all(16),
             decoration: BoxDecoration(
-              color:
-                  reached ? MaaColors.success.withAlpha(20) : MaaColors.white,
+              color: reached ? MaaColors.success.withAlpha(20) : Theme.of(context).cardTheme.color,
               borderRadius: BorderRadius.circular(20),
               border: Border.all(
                 color: reached
@@ -402,7 +438,7 @@ class _PregnancyTrackerScreenState extends State<PregnancyTrackerScreen> {
             decoration: BoxDecoration(
               color: isCurrent
                   ? MaaColors.softPurple.withAlpha(60)
-                  : MaaColors.white,
+                  : Theme.of(context).cardTheme.color,
               borderRadius: BorderRadius.circular(16),
               border: Border.all(
                 color: isCurrent
