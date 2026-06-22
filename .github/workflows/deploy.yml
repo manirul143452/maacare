@@ -19,7 +19,7 @@ jobs:
       - name: Setup Flutter
         uses: subosito/flutter-action@v2
         with:
-          flutter-version: '3.24.0'
+          flutter-version: '3.29.0'
           channel: 'stable'
           cache: true
           
@@ -46,11 +46,9 @@ jobs:
           name: maacare-web-build
           path: ./dist
           
-      - name: Deploy to InsForge
+      - name: Deploy to Netlify
         env:
-          INSFORGE_API_KEY: ${{ secrets.INSFORGE_API_KEY }}
-          INSFORGE_PROJECT_ID: "89wh46c8"
+          NETLIFY_AUTH_TOKEN: ${{ secrets.NETLIFY_AUTH_TOKEN }}
+          NETLIFY_SITE_ID: "68fb6458-dc9c-4331-aa45-72e0ba908272"
         run: |
-          # The API Key you provided (ik_...) is for InsForge.
-          # We use the @insforge/cli to ensure the deployment works with your key.
-          npx @insforge/cli deploy --project $INSFORGE_PROJECT_ID --dir ./dist --token $INSFORGE_API_KEY
+          npx netlify-cli deploy --dir=./dist --prod
