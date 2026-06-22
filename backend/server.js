@@ -71,7 +71,7 @@ let db;
 
 // Connect to MongoDB
 console.log('Connecting to MongoDB...');
-MongoClient.connect(MONGO_URI)
+MongoClient.connect(MONGO_URI, { serverSelectionTimeoutMS: 3000 })
   .then(client => {
     console.log('Connected to MongoDB successfully');
     db = client.db();
@@ -276,7 +276,7 @@ app.post('/api/auth/google/token', async (req, res) => {
     }
 
     const authCollection = db.collection('auth_users');
-    const profileCollection = db.collection('user_profiles');
+    const usersCollection = db.collection('users');
 
     // Find or create user
     let user = await authCollection.findOne({ email });
@@ -295,14 +295,16 @@ app.post('/api/auth/google/token', async (req, res) => {
         created_at: new Date(),
       });
 
-      // Create profile
-      const profileId = require('crypto').randomUUID();
-      await profileCollection.insertOne({
-        _id: profileId,
-        id: profileId,
-        user_id: userId,
-        full_name: name || email.split('@')[0],
+      // Create profile in the users collection
+      await usersCollection.insertOne({
+        _id: userId,
+        id: userId,
+        email,
+        name: name || email.split('@')[0],
         avatar_url: photoUrl || null,
+        points: 0,
+        streak: 0,
+        language: 'en',
         created_at: new Date(),
       });
 
@@ -956,7 +958,7 @@ app.post('/functions/auth_signup', async (req, res) => {
     res.status(200).json({ data: { accessToken: token, refreshToken } });
   } catch (err) {
     console.error('Auth Signup Error:', err);
-    res.status(500).json({ error: 'Internal Server Error' });
+    res.status(500).json({ error: err.message || 'Internal Server Error' });
   }
 });
 
