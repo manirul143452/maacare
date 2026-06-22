@@ -195,7 +195,7 @@ app.post('/api/auth/users', async (req, res) => {
     res.status(201).json({ accessToken: token, refreshToken });
   } catch (err) {
     console.error('SignUp Error:', err);
-    res.status(500).json({ error: 'Internal Server Error' });
+    res.status(500).json({ error: err.message || 'Internal Server Error' });
   }
 });
 
@@ -223,7 +223,7 @@ app.post('/api/auth/sessions', async (req, res) => {
     res.status(200).json({ accessToken: token, refreshToken });
   } catch (err) {
     console.error('SignIn Error:', err);
-    res.status(500).json({ error: 'Internal Server Error' });
+    res.status(500).json({ error: err.message || 'Internal Server Error' });
   }
 });
 
@@ -243,7 +243,7 @@ app.get('/api/auth/sessions/current', authenticateToken, async (req, res) => {
       }
     });
   } catch (err) {
-    res.status(500).json({ error: 'Internal Server Error' });
+    res.status(500).json({ error: err.message || 'Internal Server Error' });
   }
 });
 
@@ -573,7 +573,7 @@ app.post('/api/auth/oauth/exchange', async (req, res) => {
     res.status(200).json({ accessToken: token, refreshToken });
   } catch (err) {
     console.error('OAuth Exchange Error:', err);
-    res.status(500).json({ error: 'Internal Server Error' });
+    res.status(500).json({ error: err.message || 'Internal Server Error' });
   }
 });
 
@@ -667,7 +667,7 @@ app.post('/api/auth/token', async (req, res) => {
     res.status(400).json({ error: 'Unsupported grant_type' });
   } catch (err) {
     console.error('Token Route Error:', err);
-    res.status(500).json({ error: 'Internal Server Error' });
+    res.status(500).json({ error: err.message || 'Internal Server Error' });
   }
 });
 
@@ -1060,7 +1060,7 @@ app.post('/functions/update_user_role', authenticateToken, async (req, res) => {
     });
   } catch (err) {
     console.error('Update User Role Error:', err);
-    res.status(500).json({ error: 'Internal Server Error' });
+    res.status(500).json({ error: err.message || 'Internal Server Error' });
   }
 });
 
