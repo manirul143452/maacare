@@ -86,9 +86,74 @@ class WeeklyDetailScreen extends StatelessWidget {
                     style: const TextStyle(
                       fontSize: 16,
                       height: 1.6,
-                      color: MaaColors.textGrey,
                     ),
                   ),
+                  
+                  // WHO Clinical Guideline Card
+                  if (info['who_guideline'] != null) ...[
+                    const SizedBox(height: 40),
+                    _buildSectionHeader('🩺', "WHO Clinical Guideline"),
+                    const SizedBox(height: 16),
+                    Container(
+                      width: double.infinity,
+                      padding: const EdgeInsets.all(18),
+                      decoration: BoxDecoration(
+                        gradient: LinearGradient(
+                          colors: [
+                            MaaColors.success.withAlpha(20),
+                            MaaColors.softPurple.withAlpha(10),
+                          ],
+                          begin: Alignment.topLeft,
+                          end: Alignment.bottomRight,
+                        ),
+                        borderRadius: BorderRadius.circular(16),
+                        border: Border.all(
+                          color: MaaColors.success.withAlpha(80),
+                          width: 1,
+                        ),
+                      ),
+                      child: Column(
+                        crossAxisAlignment: CrossAxisAlignment.start,
+                        children: [
+                          Row(
+                            children: [
+                              Container(
+                                padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 4),
+                                decoration: BoxDecoration(
+                                  color: MaaColors.success,
+                                  borderRadius: BorderRadius.circular(6),
+                                ),
+                                child: const Text(
+                                  'WHO Recommendation',
+                                  style: TextStyle(
+                                    fontSize: 10,
+                                    fontWeight: FontWeight.w800,
+                                    color: Colors.white,
+                                  ),
+                                ),
+                              ),
+                              const Spacer(),
+                              const Icon(
+                                Icons.verified_user_rounded,
+                                color: MaaColors.success,
+                                size: 18,
+                              ),
+                            ],
+                          ),
+                          const SizedBox(height: 12),
+                          Text(
+                            info['who_guideline']!,
+                            style: const TextStyle(
+                              fontSize: 15,
+                              height: 1.5,
+                              color: MaaColors.white,
+                              fontWeight: FontWeight.w500,
+                            ),
+                          ),
+                        ],
+                      ),
+                    ),
+                  ],
                   const SizedBox(height: 80),
                 ],
               ),

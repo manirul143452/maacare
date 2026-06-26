@@ -12,16 +12,20 @@ import '../../app_theme.dart';
 import '../../constants.dart';
 import '../../models/user_model.dart';
 import 'dart:async';
+import 'dart:convert';
+import 'package:shared_preferences/shared_preferences.dart';
 import '../../providers/user_provider.dart';
 import '../../providers/community_provider.dart';
-import '../../data/pregnancy_data.dart';
 import '../../services/notification_service.dart';
 import '../../services/push_notification_service.dart';
 import '../../services/auto_sync_service.dart';
 import '../../widgets/loading_overlay.dart';
 import '../../utils/error_helper.dart';
-import '../../l10n/app_localizations.dart';
+import 'package:flutter_gen/gen_l10n/app_localizations.dart';
+import '../../widgets/language_picker_sheet.dart';
 import '../community/parents_park_screen.dart';
+import 'widgets/pregnancy_progress_card.dart';
+import 'package:cached_network_image/cached_network_image.dart';
 
 class HomeScreen extends StatefulWidget {
   const HomeScreen({super.key});
@@ -92,20 +96,47 @@ class _HomeScreenState extends State<HomeScreen> with TickerProviderStateMixin {
   Future<void> _fetchData() async {
     final userProvider = context.read<UserProvider>();
     final communityProvider = context.read<CommunityProvider>();
-    
+
     await userProvider.loadUser();
-    
+
     if (userProvider.error != null && mounted) {
       ErrorHelper.showError(context, userProvider.error!);
     }
-    
+
+    final user = userProvider.user;
+    if (user == null) {
+      if (mounted) {
+        Navigator.pushReplacementNamed(context, '/auth');
+      }
+      return;
+    }
+
+    if (user.userRole != 'mother') {
+      if (mounted) {
+        ScaffoldMessenger.of(context).showSnackBar(
+          const SnackBar(
+            content: Text('Access Denied: Unauthorised role for Maternal Dashboard.'),
+            backgroundColor: Colors.red,
+          ),
+        );
+        if (user.userRole == 'doctor') {
+          Navigator.pushReplacementNamed(context, '/doctor_dashboard');
+        } else if (user.userRole == 'unmarried_girl') {
+          Navigator.pushReplacementNamed(context, '/period_dashboard');
+        } else {
+          Navigator.pushReplacementNamed(context, '/role-selection');
+        }
+      }
+      return;
+    }
+
     // Initialize auto-sync service with providers
     if (!AutoSyncService.instance.isInitialized) {
       await AutoSyncService.instance.initialize(
         userProvider: userProvider,
         communityProvider: communityProvider,
       );
-      
+
       // Enable background sync for notifications
       await AutoSyncService.instance.enableBackgroundSync();
     }
@@ -116,6 +147,9 @@ class _HomeScreenState extends State<HomeScreen> with TickerProviderStateMixin {
     _confetti.dispose();
     _pulseController.dispose();
     _countdownTimer?.cancel();
+    // Trim image cache on screen exit to free memory
+    PaintingBinding.instance.imageCache.maximumSize = 100;
+    PaintingBinding.instance.imageCache.maximumSizeBytes = 50 << 20; // 50 MB
     super.dispose();
   }
 
@@ -125,32 +159,8 @@ class _HomeScreenState extends State<HomeScreen> with TickerProviderStateMixin {
       backgroundColor: Theme.of(context).scaffoldBackgroundColor,
       body: Stack(
         children: [
-          // Particle background
-          ...List.generate(20, (index) {
-            final random = index * 37 % 100;
-            final size = 1.5 + (index % 3);
-            return Positioned(
-              left: (random * 3.6) % MediaQuery.of(context).size.width,
-              top: (random * 5.2) % MediaQuery.of(context).size.height,
-              child: Container(
-                width: size,
-                height: size,
-                decoration: BoxDecoration(
-                  shape: BoxShape.circle,
-                  color: index % 3 == 0
-                      ? MaaColors.pink.withAlpha(30)
-                      : index % 3 == 1
-                          ? MaaColors.gold.withAlpha(25)
-                          : MaaColors.softPurple.withAlpha(30),
-                ),
-              ),
-            ).animate(onPlay: (c) => c.repeat()).moveY(
-                  begin: 0,
-                  end: -25,
-                  duration: Duration(seconds: 3 + (index % 4)),
-                  curve: Curves.easeInOut,
-                );
-          }),
+          // Particle background — static widget with its own lifecycle
+          const _ParticleBackground(),
           SafeArea(
             child: Consumer<UserProvider>(
               builder: (context, provider, _) => LoadingOverlay(
@@ -215,8 +225,7 @@ class _HomeScreenState extends State<HomeScreen> with TickerProviderStateMixin {
           child: Column(
             mainAxisAlignment: MainAxisAlignment.center,
             children: [
-              const Icon(Icons.wifi_off_rounded,
-                  size: 64, color: Colors.grey),
+              const Icon(Icons.wifi_off_rounded, size: 64, color: Colors.grey),
               const SizedBox(height: 16),
               Text(
                 AppLocalizations.of(context).connectionLost,
@@ -229,7 +238,9 @@ class _HomeScreenState extends State<HomeScreen> with TickerProviderStateMixin {
               Text(
                 AppLocalizations.of(context).dashboardError,
                 textAlign: TextAlign.center,
-                style: GoogleFonts.poppins(color: Theme.of(context).colorScheme.onSurface.withAlpha(180)),
+                style: GoogleFonts.poppins(
+                    color:
+                        Theme.of(context).colorScheme.onSurface.withAlpha(180)),
               ),
               const SizedBox(height: 24),
               ElevatedButton.icon(
@@ -249,7 +260,6 @@ class _HomeScreenState extends State<HomeScreen> with TickerProviderStateMixin {
 
     final user = provider.user;
     final week = user?.pregnancyWeek ?? 0;
-    final fruitData = getBabyFruitForWeek(week);
 
     return RefreshIndicator(
       onRefresh: _fetchData,
@@ -266,7 +276,7 @@ class _HomeScreenState extends State<HomeScreen> with TickerProviderStateMixin {
             const SizedBox(height: 24),
             _buildCuriosityTeaser(),
             const SizedBox(height: 20),
-            _buildBabyWeekCard(week, fruitData),
+            PregnancyProgressCard(week: week, timeRemainingStr: _timeRemainingStr),
             const SizedBox(height: 20),
             _buildMoodTracker(provider, user),
             const SizedBox(height: 20),
@@ -334,6 +344,9 @@ class _HomeScreenState extends State<HomeScreen> with TickerProviderStateMixin {
             ).animate().fadeIn(delay: 200.ms),
           ],
         ),
+        // Translation Button
+        _buildTranslationButton(),
+        const SizedBox(width: 12),
         // Notification Bell with Badge
         _buildNotificationBell(),
         const SizedBox(width: 12),
@@ -357,13 +370,23 @@ class _HomeScreenState extends State<HomeScreen> with TickerProviderStateMixin {
               backgroundColor: MaaColors.cardDark,
               child: user?.avatarUrl != null
                   ? ClipOval(
-                      child: Image.network(
-                        user!.avatarUrl!,
-                        fit: BoxFit.cover,
-                        width: 48,
-                        height: 48,
-                        errorBuilder: (_, __, ___) => _buildInitial(user),
-                      ),
+                      child: user!.avatarUrl!.startsWith('data:image')
+                          ? Image.memory(
+                              base64Decode(user.avatarUrl!.split(',').last),
+                              fit: BoxFit.cover,
+                              width: 48,
+                              height: 48,
+                              errorBuilder: (_, __, ___) => _buildInitial(user),
+                            )
+                          : CachedNetworkImage(
+                              imageUrl: user.avatarUrl!,
+                              fit: BoxFit.cover,
+                              width: 48,
+                              height: 48,
+                              memCacheWidth: 150,
+                              placeholder: (ctx, url) => _buildInitial(user),
+                              errorWidget: (ctx, url, error) => _buildInitial(user),
+                            ),
                     )
                   : _buildInitial(user),
             ),
@@ -384,25 +407,46 @@ class _HomeScreenState extends State<HomeScreen> with TickerProviderStateMixin {
     );
   }
 
+  Widget _buildTranslationButton() {
+    return GestureDetector(
+      onTap: () => LanguagePickerSheet.show(context),
+      child: Container(
+        padding: const EdgeInsets.all(10),
+        decoration: BoxDecoration(
+          color: MaaColors.glassBackground,
+          borderRadius: BorderRadius.circular(14),
+          border: Border.all(
+            color: MaaColors.glassBorder,
+          ),
+        ),
+        child: const Icon(
+          Icons.translate_rounded,
+          color: MaaColors.textMuted,
+          size: 24,
+        ),
+      ),
+    );
+  }
+
   Widget _buildNotificationBell() {
     return StreamBuilder<int>(
       stream: PushNotificationService.instance.onBadgeCountChanged,
       initialData: PushNotificationService.instance.unreadCount,
       builder: (context, snapshot) {
         final unreadCount = snapshot.data ?? 0;
-        
+
         return GestureDetector(
           onTap: () => Navigator.pushNamed(context, '/notifications'),
           child: Container(
             padding: const EdgeInsets.all(10),
             decoration: BoxDecoration(
-              color: unreadCount > 0 
-                  ? MaaColors.pink.withAlpha(30) 
+              color: unreadCount > 0
+                  ? MaaColors.pink.withAlpha(30)
                   : MaaColors.glassBackground,
               borderRadius: BorderRadius.circular(14),
               border: Border.all(
-                color: unreadCount > 0 
-                    ? MaaColors.pink.withAlpha(50) 
+                color: unreadCount > 0
+                    ? MaaColors.pink.withAlpha(50)
                     : MaaColors.glassBorder,
               ),
             ),
@@ -410,8 +454,8 @@ class _HomeScreenState extends State<HomeScreen> with TickerProviderStateMixin {
               clipBehavior: Clip.none,
               children: [
                 Icon(
-                  unreadCount > 0 
-                      ? Icons.notifications_active_rounded 
+                  unreadCount > 0
+                      ? Icons.notifications_active_rounded
                       : Icons.notifications_outlined,
                   color: unreadCount > 0 ? MaaColors.pink : MaaColors.textMuted,
                   size: 24,
@@ -504,238 +548,6 @@ class _HomeScreenState extends State<HomeScreen> with TickerProviderStateMixin {
     ).animate().fadeIn(delay: 300.ms).slideX(begin: 0.1, end: 0);
   }
 
-  Widget _buildBabyWeekCard(int week, Map<String, String> fruitData) {
-    final pregnancyInfo = getPregnancyInfoForWeek(week);
-    final title = pregnancyInfo?['title'] ?? 'Growing Miracle';
-
-    return Container(
-      width: double.infinity,
-      decoration: BoxDecoration(
-        borderRadius: BorderRadius.circular(28),
-        boxShadow: [
-          BoxShadow(
-            color: MaaColors.pink.withAlpha(40),
-            blurRadius: 30,
-            offset: const Offset(0, 15),
-          ),
-        ],
-      ),
-      child: ClipRRect(
-        borderRadius: BorderRadius.circular(28),
-        child: Stack(
-          children: [
-            // Weekly Background Image
-            Image.asset(
-              'images/weeks/week_$week.jpg',
-              width: double.infinity,
-              height: 220,
-              fit: BoxFit.cover,
-              errorBuilder: (_, __, ___) => Container(
-                height: 220,
-                decoration:
-                    const BoxDecoration(gradient: MaaColors.primaryGradient),
-              ),
-            ),
-
-            // Glassmorphism Overlay
-            Positioned.fill(
-              child: Container(
-                decoration: BoxDecoration(
-                  gradient: LinearGradient(
-                    begin: Alignment.topCenter,
-                    end: Alignment.bottomCenter,
-                    colors: [
-                      Colors.black.withAlpha(50),
-                      MaaColors.background.withAlpha(200),
-                    ],
-                  ),
-                ),
-              ),
-            ),
-
-            // Content
-            Padding(
-              padding: const EdgeInsets.all(24),
-              child: Column(
-                crossAxisAlignment: CrossAxisAlignment.start,
-                children: [
-                  Row(
-                    mainAxisAlignment: MainAxisAlignment.spaceBetween,
-                    children: [
-                      Container(
-                        padding: const EdgeInsets.symmetric(
-                            horizontal: 14, vertical: 8),
-                        decoration: BoxDecoration(
-                          color: MaaColors.white.withAlpha(30),
-                          borderRadius: BorderRadius.circular(24),
-                          border:
-                              Border.all(color: MaaColors.white.withAlpha(50)),
-                        ),
-                        child: Text(
-                          '${AppLocalizations.of(context).week} $week',
-                          style: GoogleFonts.poppins(
-                            color: Colors.white,
-                            fontSize: 14,
-                            fontWeight: FontWeight.w700,
-                            letterSpacing: 1.2,
-                          ),
-                        ),
-                      ),
-                      // Real-time Countdown Badge
-                      if (_timeRemainingStr.isNotEmpty)
-                        Container(
-                          padding: const EdgeInsets.symmetric(
-                              horizontal: 12, vertical: 6),
-                          decoration: BoxDecoration(
-                            color: MaaColors.pink.withAlpha(200),
-                            borderRadius: BorderRadius.circular(12),
-                            boxShadow: const [
-                              BoxShadow(
-                                  color: MaaColors.pinkGlow, blurRadius: 10),
-                            ],
-                          ),
-                          child: Text(
-                            _timeRemainingStr,
-                            style: GoogleFonts.poppins(
-                              color: MaaColors.white,
-                              fontSize: 10,
-                              fontWeight: FontWeight.w800,
-                            ),
-                          ),
-                        )
-                            .animate(onPlay: (c) => c.repeat())
-                            .shimmer(duration: 3000.ms),
-                    ],
-                  ),
-                  const SizedBox(height: 20),
-                  Text(
-                    title,
-                    style: GoogleFonts.poppins(
-                      color: MaaColors.white,
-                      fontSize: 22,
-                      fontWeight: FontWeight.w800,
-                      shadows: [
-                        const Shadow(
-                            color: Colors.black,
-                            blurRadius: 10,
-                            offset: Offset(0, 2)),
-                      ],
-                    ),
-                  ),
-                  const SizedBox(height: 8),
-                  Row(
-                    children: [
-                      Text(
-                        '${AppLocalizations.of(context).sizeOfA} ${fruitData['fruit']} ',
-                        style: GoogleFonts.poppins(
-                          color: Colors.white.withAlpha(220),
-                          fontSize: 14,
-                          fontWeight: FontWeight.w500,
-                        ),
-                      ),
-                      Text(
-                        fruitData['emoji'] ?? '👶',
-                        style: const TextStyle(fontSize: 18),
-                      ).animate(onPlay: (c) => c.repeat()).scale(
-                            begin: const Offset(1, 1),
-                            end: const Offset(1.3, 1.3),
-                            duration: 1000.ms,
-                            curve: Curves.easeInOut,
-                          ),
-                    ],
-                  ),
-                  const SizedBox(height: 20),
-
-                  // Shimmering Progress Bar
-                  Stack(
-                    children: [
-                      Container(
-                        height: 10,
-                        decoration: BoxDecoration(
-                          color: MaaColors.white.withAlpha(30),
-                          borderRadius: BorderRadius.circular(6),
-                        ),
-                      ),
-                      FractionallySizedBox(
-                        widthFactor: (week / 40).clamp(0.0, 1.0),
-                        child: Container(
-                          height: 10,
-                          decoration: BoxDecoration(
-                            gradient: const LinearGradient(
-                              colors: [
-                                MaaColors.gold,
-                                MaaColors.pink,
-                                MaaColors.white
-                              ],
-                            ),
-                            borderRadius: BorderRadius.circular(6),
-                            boxShadow: [
-                              BoxShadow(
-                                color: MaaColors.gold.withAlpha(150),
-                                blurRadius: 12,
-                                spreadRadius: 2,
-                              ),
-                            ],
-                          ),
-                        )
-                            .animate(onPlay: (c) => c.repeat())
-                            .shimmer(duration: 5000.ms),
-                      ),
-                    ],
-                  ),
-                  const SizedBox(height: 12),
-                  Row(
-                    mainAxisAlignment: MainAxisAlignment.spaceBetween,
-                    children: [
-                      Text(
-                        '${40 - week} ${AppLocalizations.of(context).weeksToMeet}',
-                        style: GoogleFonts.poppins(
-                          color: Colors.white.withAlpha(200),
-                          fontSize: 12,
-                          fontWeight: FontWeight.w600,
-                        ),
-                      ),
-                      GestureDetector(
-                        onTap: () => Navigator.pushNamed(context, '/tracker'),
-                        child: Container(
-                          padding: const EdgeInsets.symmetric(
-                              horizontal: 12, vertical: 6),
-                          decoration: BoxDecoration(
-                            color: Colors.white.withAlpha(20),
-                            borderRadius: BorderRadius.circular(20),
-                            border: Border.all(
-                                color: Colors.white.withAlpha(40)),
-                          ),
-                          child: Row(
-                            children: [
-                              Text(
-                                '${AppLocalizations.of(context).guide} ',
-                                style: GoogleFonts.poppins(
-                                  color: Colors.white,
-                                  fontSize: 10,
-                                  fontWeight: FontWeight.w700,
-                                ),
-                              ),
-                              const Icon(Icons.arrow_forward_ios_rounded,
-                                  color: MaaColors.white, size: 8),
-                            ],
-                          ),
-                        ),
-                      ),
-                    ],
-                  ),
-                ],
-              ),
-            ),
-          ],
-        ),
-      ),
-    )
-        .animate()
-        .fadeIn(duration: 800.ms)
-        .slideY(begin: 0.1, end: 0, curve: Curves.easeOutBack);
-  }
-
   Widget _buildMoodTracker(UserProvider provider, UserModel? user) {
     return GlassContainer(
       child: Column(
@@ -768,6 +580,34 @@ class _HomeScreenState extends State<HomeScreen> with TickerProviderStateMixin {
             onSelect: (mood) async {
               await provider.updateMood(mood);
               _confetti.play();
+
+              // Save mood score to Health Insights chart history
+              // Emoji → numeric score (1.0 sad → 5.0 happy)
+              const moodScores = {
+                '😢': 1.0, 'Sad': 1.0, 'Crying': 1.0,
+                '😔': 2.0, 'Low': 2.0,
+                '😰': 2.0, 'Anxious': 2.0, 'Worried': 2.0,
+                '😐': 3.0, 'Okay': 3.0, 'Neutral': 3.0,
+                '🙂': 4.0, 'Good': 4.0,
+                '😊': 4.0, 'Happy': 4.0, 'Grateful': 4.0,
+                '😄': 5.0, 'Great': 5.0, 'Excited': 5.0,
+              };
+              final score = moodScores[mood] ?? 3.0;
+              try {
+                final prefs = await SharedPreferences.getInstance();
+                final raw = prefs.getString('insights_mood_logs');
+                final history = raw != null
+                    ? (jsonDecode(raw) as List).map((e) => (e as num).toDouble()).toList()
+                    : <double>[3.0, 3.0, 3.0, 3.0, 3.0, 3.0];
+                history.add(score);
+                // Keep rolling 7-day window
+                final trimmed = history.length > 7
+                    ? history.sublist(history.length - 7)
+                    : history;
+                await prefs.setString(
+                    'insights_mood_logs', jsonEncode(trimmed));
+              } catch (_) {}
+
               if (mounted) {
                 ErrorHelper.showSuccess(
                     context, AppLocalizations.of(context).moodLogged);
@@ -785,7 +625,8 @@ class _HomeScreenState extends State<HomeScreen> with TickerProviderStateMixin {
       decoration: BoxDecoration(
         color: Theme.of(context).cardTheme.color,
         borderRadius: BorderRadius.circular(20),
-        border: Border.all(color: Theme.of(context).colorScheme.onSurface.withAlpha(20)),
+        border: Border.all(
+            color: Theme.of(context).colorScheme.onSurface.withAlpha(20)),
         boxShadow: [
           BoxShadow(
             color: MaaColors.darkShadow,
@@ -831,7 +672,10 @@ class _HomeScreenState extends State<HomeScreen> with TickerProviderStateMixin {
                       AppLocalizations.of(context).trackSymptomsHelp,
                       style: GoogleFonts.poppins(
                         fontSize: 12,
-                        color: Theme.of(context).colorScheme.onSurface.withAlpha(180),
+                        color: Theme.of(context)
+                            .colorScheme
+                            .onSurface
+                            .withAlpha(180),
                       ),
                     ),
                   ],
@@ -874,7 +718,10 @@ class _HomeScreenState extends State<HomeScreen> with TickerProviderStateMixin {
                         AppLocalizations.of(context).yourHealthScore,
                         style: GoogleFonts.poppins(
                           fontSize: 13,
-                          color: Theme.of(context).colorScheme.onSurface.withAlpha(180),
+                          color: Theme.of(context)
+                              .colorScheme
+                              .onSurface
+                              .withAlpha(180),
                         ),
                       ),
                       const SizedBox(height: 6),
@@ -937,85 +784,228 @@ class _HomeScreenState extends State<HomeScreen> with TickerProviderStateMixin {
   }
 
   Widget _buildPointsCard(UserModel? user) {
+    return GestureDetector(
+      onTap: () {
+        showModalBottomSheet(
+          context: context,
+          backgroundColor: Colors.transparent,
+          isScrollControlled: true,
+          builder: (context) => _buildRewardsBottomSheet(user),
+        );
+      },
+      child: Container(
+        padding: const EdgeInsets.all(20),
+        decoration: BoxDecoration(
+          gradient: MaaColors.goldGradient,
+          borderRadius: BorderRadius.circular(20),
+          boxShadow: [
+            BoxShadow(
+              color: MaaColors.gold.withAlpha(80),
+              blurRadius: 20,
+              offset: const Offset(0, 6),
+            ),
+          ],
+        ),
+        child: Row(
+          children: [
+            Container(
+              width: 56,
+              height: 56,
+              decoration: BoxDecoration(
+                color: MaaColors.white.withAlpha(30),
+                shape: BoxShape.circle,
+              ),
+              child: const Center(
+                child: Text('🏆', style: TextStyle(fontSize: 28)),
+              ),
+            ),
+            const SizedBox(width: 16),
+            Expanded(
+              child: Column(
+                crossAxisAlignment: CrossAxisAlignment.start,
+                children: [
+                  Text(
+                    '${user?.points ?? 0} MaaPoints',
+                    style: GoogleFonts.poppins(
+                      color: MaaColors.white,
+                      fontSize: 22,
+                      fontWeight: FontWeight.w700,
+                    ),
+                  ),
+                  Text(
+                    user?.badgeTitle ?? '🌸 New Mom',
+                    style: GoogleFonts.poppins(
+                      color: MaaColors.white.withAlpha(200),
+                      fontSize: 13,
+                    ),
+                  ),
+                ],
+              ),
+            ),
+            Container(
+              padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 8),
+              decoration: BoxDecoration(
+                color: MaaColors.white.withAlpha(30),
+                borderRadius: BorderRadius.circular(12),
+              ),
+              child: Column(
+                children: [
+                  const Text('🔥', style: TextStyle(fontSize: 20)),
+                  Text(
+                    '${user?.streak ?? 0}',
+                    style: GoogleFonts.poppins(
+                      color: MaaColors.white,
+                      fontSize: 14,
+                      fontWeight: FontWeight.w700,
+                    ),
+                  ),
+                  Text(
+                    'streak',
+                    style: GoogleFonts.poppins(
+                      color: MaaColors.white.withAlpha(180),
+                      fontSize: 10,
+                    ),
+                  ),
+                ],
+              ),
+            ),
+          ],
+        ),
+      ).animate().fadeIn(delay: 600.ms).moveY(begin: 20, end: 0),
+    );
+  }
+
+  Widget _buildRewardsBottomSheet(UserModel? user) {
     return Container(
-      padding: const EdgeInsets.all(20),
       decoration: BoxDecoration(
-        gradient: MaaColors.goldGradient,
-        borderRadius: BorderRadius.circular(20),
-        boxShadow: [
-          BoxShadow(
-            color: MaaColors.gold.withAlpha(80),
-            blurRadius: 20,
-            offset: const Offset(0, 6),
+        color: Theme.of(context).scaffoldBackgroundColor,
+        borderRadius: const BorderRadius.vertical(top: Radius.circular(32)),
+        border: Border.all(color: MaaColors.gold.withAlpha(50), width: 2),
+      ),
+      padding: const EdgeInsets.fromLTRB(24, 12, 24, 32),
+      child: Column(
+        mainAxisSize: MainAxisSize.min,
+        children: [
+          Container(
+            width: 40,
+            height: 5,
+            decoration: BoxDecoration(
+              color: MaaColors.textMuted.withAlpha(100),
+              borderRadius: BorderRadius.circular(10),
+            ),
           ),
+          const SizedBox(height: 24),
+          Container(
+            padding: const EdgeInsets.all(20),
+            decoration: BoxDecoration(
+              gradient: MaaColors.goldGradient,
+              borderRadius: BorderRadius.circular(24),
+            ),
+            child: Row(
+              children: [
+                const Text('🎁', style: TextStyle(fontSize: 40)),
+                const SizedBox(width: 16),
+                Expanded(
+                  child: Column(
+                    crossAxisAlignment: CrossAxisAlignment.start,
+                    children: [
+                      Text(
+                        'Your Rewards',
+                        style: GoogleFonts.poppins(
+                            color: Colors.white,
+                            fontSize: 16,
+                            fontWeight: FontWeight.bold),
+                      ),
+                      Text(
+                        '${user?.points ?? 0} MaaPoints Available',
+                        style: GoogleFonts.poppins(
+                            color: Colors.white,
+                            fontSize: 22,
+                            fontWeight: FontWeight.w900),
+                      ),
+                    ],
+                  ),
+                ),
+              ],
+            ),
+          ),
+          const SizedBox(height: 32),
+          Text(
+            'How to earn MaaPoints?',
+            style: GoogleFonts.poppins(
+                fontSize: 18,
+                fontWeight: FontWeight.bold,
+                color: Theme.of(context).colorScheme.onSurface),
+          ),
+          const SizedBox(height: 16),
+          _buildRewardTask('Log daily mood', '+10 Points', '🌤', true),
+          const SizedBox(height: 12),
+          _buildRewardTask('Complete daily checklist', '+20 Points', '✅', true),
+          const SizedBox(height: 12),
+          _buildRewardTask('Engage in Parents Park', '+15 Points', '💬', true),
+          const SizedBox(height: 12),
+          _buildRewardTask('Read Health Articles', '+5 Points', '📚', true),
+          const SizedBox(height: 32),
+          SizedBox(
+            width: double.infinity,
+            child: ElevatedButton(
+              onPressed: () => Navigator.pop(context),
+              style: ElevatedButton.styleFrom(
+                backgroundColor: MaaColors.gold,
+                foregroundColor: Colors.white,
+                padding: const EdgeInsets.symmetric(vertical: 16),
+                shape: RoundedRectangleBorder(
+                    borderRadius: BorderRadius.circular(16)),
+              ),
+              child: Text(AppLocalizations.of(context).keepEarning,
+                  style: const TextStyle(fontSize: 16, fontWeight: FontWeight.bold)),
+            ),
+          )
         ],
+      ),
+    );
+  }
+
+  Widget _buildRewardTask(
+      String title, String reward, String emoji, bool isActive) {
+    return Container(
+      padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 12),
+      decoration: BoxDecoration(
+        color: Theme.of(context).cardTheme.color,
+        borderRadius: BorderRadius.circular(16),
+        border: Border.all(color: MaaColors.gold.withAlpha(30)),
       ),
       child: Row(
         children: [
           Container(
-            width: 56,
-            height: 56,
+            padding: const EdgeInsets.all(10),
             decoration: BoxDecoration(
-              color: MaaColors.white.withAlpha(30),
-              shape: BoxShape.circle,
+              color: MaaColors.gold.withAlpha(20),
+              borderRadius: BorderRadius.circular(12),
             ),
-            child: const Center(
-              child: Text('🏆', style: TextStyle(fontSize: 28)),
-            ),
+            child: Text(emoji, style: const TextStyle(fontSize: 20)),
           ),
           const SizedBox(width: 16),
           Expanded(
             child: Column(
               crossAxisAlignment: CrossAxisAlignment.start,
               children: [
-                Text(
-                  '${user?.points ?? 0} MaaPoints',
-                  style: GoogleFonts.poppins(
-                    color: MaaColors.white,
-                    fontSize: 22,
-                    fontWeight: FontWeight.w700,
-                  ),
-                ),
-                Text(
-                  user?.badgeTitle ?? '🌸 New Mom',
-                  style: GoogleFonts.poppins(
-                    color: MaaColors.white.withAlpha(200),
-                    fontSize: 13,
-                  ),
-                ),
-              ],
-            ),
-          ),
-          Container(
-            padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 8),
-            decoration: BoxDecoration(
-              color: MaaColors.white.withAlpha(30),
-              borderRadius: BorderRadius.circular(12),
-            ),
-            child: Column(
-              children: [
-                const Text('🔥', style: TextStyle(fontSize: 20)),
-                Text(
-                  '${user?.streak ?? 0}',
-                  style: GoogleFonts.poppins(
-                    color: MaaColors.white,
-                    fontSize: 14,
-                    fontWeight: FontWeight.w700,
-                  ),
-                ),
-                Text(
-                  'streak',
-                  style: GoogleFonts.poppins(
-                    color: MaaColors.white.withAlpha(180),
-                    fontSize: 10,
-                  ),
-                ),
+                Text(title,
+                    style: GoogleFonts.poppins(
+                        fontSize: 14,
+                        fontWeight: FontWeight.w600,
+                        color: Theme.of(context).colorScheme.onSurface)),
+                Text(reward,
+                    style: GoogleFonts.poppins(
+                        fontSize: 12,
+                        fontWeight: FontWeight.bold,
+                        color: MaaColors.gold)),
               ],
             ),
           ),
         ],
       ),
-    ).animate().fadeIn(delay: 600.ms).moveY(begin: 20, end: 0);
+    );
   }
 
   Widget _buildDailyTip(int week) {
@@ -1081,15 +1071,30 @@ class _HomeScreenState extends State<HomeScreen> with TickerProviderStateMixin {
 
   Widget _buildQuickActions() {
     final actions = [
-      const _QuickAction(Icons.chat_bubble_rounded, 'Maa AI', '/chat', MaaColors.pink, Icons.chat_bubble_outline),
-      const _QuickAction(Icons.track_changes_rounded, 'Tracker', '/tracker', MaaColors.softPurple, Icons.track_changes_outlined),
-      const _QuickAction(Icons.healing_rounded, 'Symptoms', '/symptoms', MaaColors.warning, Icons.healing_outlined),
-      const _QuickAction(Icons.spa_rounded, 'Self Care', '/selfcare', MaaColors.softGreen, Icons.spa_outlined),
-      const _QuickAction(Icons.restaurant_menu_rounded, 'Nutrition', '/nutrition', MaaColors.lightBlue, Icons.restaurant_menu_outlined),
-      const _QuickAction(Icons.vaccines_rounded, 'Vaccines', '/vaccinations', MaaColors.peach, Icons.vaccines_outlined),
-      const _QuickAction(Icons.menu_book_rounded, 'Care Guide', '/guide', MaaColors.gold, Icons.menu_book_outlined),
-      const _QuickAction(Icons.shield_rounded, 'Contraception', '/contraception', Color(0xFF7C4DFF), Icons.shield_outlined),
-      const _QuickAction(Icons.family_restroom_rounded, 'Planning', '/planning', MaaColors.softGreen, Icons.family_restroom_outlined),
+      const _QuickAction(Icons.chat_bubble_rounded, 'Maa AI', '/chat',
+          MaaColors.pink, Icons.chat_bubble_outline),
+      const _QuickAction(Icons.track_changes_rounded, 'Tracker', '/tracker',
+          MaaColors.softPurple, Icons.track_changes_outlined),
+      const _QuickAction(Icons.healing_rounded, 'Symptoms', '/symptoms',
+          MaaColors.warning, Icons.healing_outlined),
+      const _QuickAction(Icons.spa_rounded, 'Self Care', '/selfcare',
+          MaaColors.softGreen, Icons.spa_outlined),
+      const _QuickAction(Icons.restaurant_menu_rounded, 'Nutrition',
+          '/nutrition', MaaColors.lightBlue, Icons.restaurant_menu_outlined),
+      const _QuickAction(Icons.vaccines_rounded, 'Vaccines', '/vaccinations',
+          MaaColors.peach, Icons.vaccines_outlined),
+      const _QuickAction(Icons.child_care_rounded, 'Baby Growth', '/child-growth',
+          MaaColors.pink, Icons.child_care_outlined),
+      const _QuickAction(Icons.analytics_rounded, 'Insights', '/health-insights',
+          MaaColors.gold, Icons.analytics_outlined),
+      const _QuickAction(Icons.video_call_rounded, 'Consult', '/consult',
+          MaaColors.success, Icons.video_call_outlined),
+      const _QuickAction(Icons.menu_book_rounded, 'Care Guide', '/guide',
+          MaaColors.gold, Icons.menu_book_outlined),
+      const _QuickAction(Icons.shield_rounded, 'Contraception & Planning',
+          '/contraception', Color(0xFF7C4DFF), Icons.shield_outlined),
+      const _QuickAction(Icons.family_restroom_rounded, 'Planning', '/planning',
+          MaaColors.softGreen, Icons.family_restroom_outlined),
     ];
 
     return Column(
@@ -1259,12 +1264,17 @@ class _HomeScreenState extends State<HomeScreen> with TickerProviderStateMixin {
                   icon: Icon(item.icon, color: MaaColors.textMuted),
                   selectedIcon: Icon(item.icon, color: MaaColors.pink),
                   label: () {
-                    switch(item.label) {
-                      case 'Home': return AppLocalizations.of(context).navHome;
-                      case 'Tracker': return AppLocalizations.of(context).navTracker;
-                      case 'Park': return AppLocalizations.of(context).navCommunity;
-                      case 'Me': return AppLocalizations.of(context).navProfile;
-                      default: return item.label;
+                    switch (item.label) {
+                      case 'Home':
+                        return AppLocalizations.of(context).navHome;
+                      case 'Tracker':
+                        return AppLocalizations.of(context).navTracker;
+                      case 'Park':
+                        return AppLocalizations.of(context).navCommunity;
+                      case 'Me':
+                        return AppLocalizations.of(context).navProfile;
+                      default:
+                        return item.label;
                     }
                   }(),
                 ))
@@ -1341,25 +1351,31 @@ class _HomeScreenState extends State<HomeScreen> with TickerProviderStateMixin {
     return Consumer<CommunityProvider>(
       builder: (context, provider, _) {
         // Auto-fetch posts when widget builds (if not already loading)
-        if (!provider.isLoading && provider.posts.isEmpty && provider.error == null) {
+        if (!provider.isLoading &&
+            provider.posts.isEmpty &&
+            provider.error == null) {
           WidgetsBinding.instance.addPostFrameCallback((_) {
             provider.fetchPosts(limit: 5);
           });
         }
 
         final posts = provider.posts.take(5).toList();
-        
+
         // Fallback content if no posts yet
-        final displayItems = posts.isEmpty 
-          ? _getFallbackPosts()
-          : posts.map((p) => _PostDisplayItem(
-              id: p.id,
-              text: p.content,
-              imageUrl: p.imageUrl,
-              likes: p.likes,
-              authorName: p.anonymous ? 'Anonymous Mama' : (p.authorName ?? 'Mama'),
-              weekTag: p.weekTag,
-            )).toList();
+        final displayItems = posts.isEmpty
+            ? _getFallbackPosts()
+            : posts
+                .map((p) => _PostDisplayItem(
+                      id: p.id,
+                      text: p.content,
+                      imageUrl: p.imageUrl,
+                      likes: p.likes,
+                      authorName: p.anonymous
+                          ? 'Anonymous Mama'
+                          : (p.authorName ?? 'Mama'),
+                      weekTag: p.weekTag,
+                    ))
+                .toList();
 
         return Column(
           crossAxisAlignment: CrossAxisAlignment.start,
@@ -1373,11 +1389,15 @@ class _HomeScreenState extends State<HomeScreen> with TickerProviderStateMixin {
                       padding: const EdgeInsets.all(8),
                       decoration: BoxDecoration(
                         gradient: LinearGradient(
-                          colors: [MaaColors.pink.withAlpha(150), MaaColors.softPurple.withAlpha(100)],
+                          colors: [
+                            MaaColors.pink.withAlpha(150),
+                            MaaColors.softPurple.withAlpha(100)
+                          ],
                         ),
                         borderRadius: BorderRadius.circular(12),
                       ),
-                      child: const Icon(Icons.favorite_rounded, color: Colors.white, size: 18),
+                      child: const Icon(Icons.favorite_rounded,
+                          color: Colors.white, size: 18),
                     ),
                     const SizedBox(width: 12),
                     Text(
@@ -1394,21 +1414,25 @@ class _HomeScreenState extends State<HomeScreen> with TickerProviderStateMixin {
                   onPressed: () {
                     Navigator.push(
                       context,
-                      MaterialPageRoute(builder: (_) => const ParentsParkScreen()),
+                      MaterialPageRoute(
+                          builder: (_) => const ParentsParkScreen()),
                     );
                   },
                   icon: const Icon(Icons.arrow_forward_rounded, size: 16),
-                  label: Text('View All', style: GoogleFonts.poppins(color: MaaColors.pink, fontWeight: FontWeight.w600)),
+                  label: Text(AppLocalizations.of(context).viewAll,
+                      style: GoogleFonts.poppins(
+                          color: MaaColors.pink, fontWeight: FontWeight.w600)),
                 )
               ],
             ),
             const SizedBox(height: 16),
-            
+
             // Live indicator when using real data
             if (posts.isNotEmpty)
               Container(
                 margin: const EdgeInsets.only(bottom: 12),
-                padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 6),
+                padding:
+                    const EdgeInsets.symmetric(horizontal: 12, vertical: 6),
                 decoration: BoxDecoration(
                   color: MaaColors.success.withAlpha(20),
                   borderRadius: BorderRadius.circular(20),
@@ -1424,10 +1448,16 @@ class _HomeScreenState extends State<HomeScreen> with TickerProviderStateMixin {
                         color: MaaColors.success,
                         shape: BoxShape.circle,
                         boxShadow: [
-                          BoxShadow(color: MaaColors.success.withAlpha(150), blurRadius: 6, spreadRadius: 1),
+                          BoxShadow(
+                              color: MaaColors.success.withAlpha(150),
+                              blurRadius: 6,
+                              spreadRadius: 1),
                         ],
                       ),
-                    ).animate(onPlay: (c) => c.repeat()).scale(begin: const Offset(1, 1), end: const Offset(1.3, 1.3), duration: 1000.ms),
+                    ).animate(onPlay: (c) => c.repeat()).scale(
+                        begin: const Offset(1, 1),
+                        end: const Offset(1.3, 1.3),
+                        duration: 1000.ms),
                     const SizedBox(width: 8),
                     Text(
                       'Live Updates',
@@ -1440,7 +1470,7 @@ class _HomeScreenState extends State<HomeScreen> with TickerProviderStateMixin {
                   ],
                 ),
               ),
-            
+
             SizedBox(
               height: 180,
               child: ListView.builder(
@@ -1463,7 +1493,8 @@ class _HomeScreenState extends State<HomeScreen> with TickerProviderStateMixin {
     return [
       _PostDisplayItem(
         id: '1',
-        text: 'How to handle teething? Looking for tips from experienced mamas 💕',
+        text:
+            'How to handle teething? Looking for tips from experienced mamas 💕',
         imageUrl: null,
         likes: 24,
         authorName: 'Priya M.',
@@ -1535,7 +1566,8 @@ class _HomeScreenState extends State<HomeScreen> with TickerProviderStateMixin {
                 children: [
                   // Header with author
                   Container(
-                    padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 10),
+                    padding: const EdgeInsets.symmetric(
+                        horizontal: 12, vertical: 10),
                     decoration: BoxDecoration(
                       gradient: LinearGradient(
                         colors: [
@@ -1579,7 +1611,7 @@ class _HomeScreenState extends State<HomeScreen> with TickerProviderStateMixin {
                       ],
                     ),
                   ),
-                  
+
                   // Content
                   Expanded(
                     child: Padding(
@@ -1597,15 +1629,17 @@ class _HomeScreenState extends State<HomeScreen> with TickerProviderStateMixin {
                       ),
                     ),
                   ),
-                  
+
                   // Footer with likes and week tag
                   Padding(
-                    padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 10),
+                    padding: const EdgeInsets.symmetric(
+                        horizontal: 12, vertical: 10),
                     child: Row(
                       mainAxisAlignment: MainAxisAlignment.spaceBetween,
                       children: [
                         Container(
-                          padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 4),
+                          padding: const EdgeInsets.symmetric(
+                              horizontal: 8, vertical: 4),
                           decoration: BoxDecoration(
                             color: MaaColors.pink.withAlpha(20),
                             borderRadius: BorderRadius.circular(10),
@@ -1613,7 +1647,8 @@ class _HomeScreenState extends State<HomeScreen> with TickerProviderStateMixin {
                           child: Row(
                             mainAxisSize: MainAxisSize.min,
                             children: [
-                              const Icon(Icons.favorite_rounded, color: MaaColors.pink, size: 12),
+                              const Icon(Icons.favorite_rounded,
+                                  color: MaaColors.pink, size: 12),
                               const SizedBox(width: 4),
                               Text(
                                 '${post.likes}',
@@ -1628,7 +1663,8 @@ class _HomeScreenState extends State<HomeScreen> with TickerProviderStateMixin {
                         ),
                         if (post.weekTag > 0)
                           Container(
-                            padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 4),
+                            padding: const EdgeInsets.symmetric(
+                                horizontal: 8, vertical: 4),
                             decoration: BoxDecoration(
                               color: MaaColors.softPurple.withAlpha(20),
                               borderRadius: BorderRadius.circular(10),
@@ -1647,7 +1683,7 @@ class _HomeScreenState extends State<HomeScreen> with TickerProviderStateMixin {
                   ),
                 ],
               ),
-              
+
               // "Read More" overlay at bottom
               Positioned(
                 bottom: 0,
@@ -1667,7 +1703,8 @@ class _HomeScreenState extends State<HomeScreen> with TickerProviderStateMixin {
                   ),
                   child: Center(
                     child: Container(
-                      padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 4),
+                      padding: const EdgeInsets.symmetric(
+                          horizontal: 12, vertical: 4),
                       decoration: BoxDecoration(
                         color: MaaColors.pink.withAlpha(30),
                         borderRadius: BorderRadius.circular(12),
@@ -1726,5 +1763,80 @@ class _QuickAction {
   final String route;
   final Color color;
   final IconData? outlinedIcon;
-  const _QuickAction(this.icon, this.label, this.route, this.color, [this.outlinedIcon]);
+  const _QuickAction(this.icon, this.label, this.route, this.color,
+      [this.outlinedIcon]);
+}
+
+// ─── Isolated particle widget: AnimationControllers owned & disposed here ─────
+class _ParticleBackground extends StatefulWidget {
+  const _ParticleBackground();
+  @override
+  State<_ParticleBackground> createState() => _ParticleBackgroundState();
+}
+
+class _ParticleBackgroundState extends State<_ParticleBackground>
+    with TickerProviderStateMixin {
+  static const int _count = 12;
+  late final List<AnimationController> _controllers;
+  late final List<Animation<double>> _animations;
+
+  @override
+  void initState() {
+    super.initState();
+    _controllers = List.generate(
+      _count,
+      (i) => AnimationController(
+        vsync: this,
+        duration: Duration(seconds: 3 + (i % 4)),
+      )..repeat(reverse: true),
+    );
+    _animations = _controllers
+        .map((c) => Tween<double>(begin: 0, end: -25)
+            .animate(CurvedAnimation(parent: c, curve: Curves.easeInOut)))
+        .toList();
+  }
+
+  @override
+  void dispose() {
+    for (final c in _controllers) {
+      c.dispose();
+    }
+    super.dispose();
+  }
+
+  @override
+  Widget build(BuildContext context) {
+    final size = MediaQuery.of(context).size;
+    return RepaintBoundary(
+      child: IgnorePointer(
+        child: Stack(
+          children: List.generate(_count, (i) {
+            final random = i * 37 % 100;
+            final dotSize = 1.5 + (i % 3).toDouble();
+            final color = i % 3 == 0
+                ? MaaColors.pink.withAlpha(30)
+                : i % 3 == 1
+                    ? MaaColors.gold.withAlpha(25)
+                    : MaaColors.softPurple.withAlpha(30);
+            return Positioned(
+              left: (random * 3.6) % size.width,
+              top: (random * 5.2) % size.height,
+              child: AnimatedBuilder(
+                animation: _animations[i],
+                builder: (_, __) => Transform.translate(
+                  offset: Offset(0, _animations[i].value),
+                  child: Container(
+                    width: dotSize,
+                    height: dotSize,
+                    decoration:
+                        BoxDecoration(shape: BoxShape.circle, color: color),
+                  ),
+                ),
+              ),
+            );
+          }),
+        ),
+      ),
+    );
+  }
 }

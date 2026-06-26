@@ -11,6 +11,12 @@ import '../../models/medical_models.dart';
 import '../../services/medical_data_service.dart';
 import '../../widgets/maa_button.dart';
 import '../../widgets/loading_overlay.dart';
+import '../../services/auth_service.dart';
+import '../../services/maacare_backend_service.dart';
+import '../../models/symptom_vaccination_model.dart' show evaluateRisk, commonSymptoms;
+import 'package:shared_preferences/shared_preferences.dart';
+import 'dart:convert';
+import 'package:url_launcher/url_launcher.dart';
 
 class SymptomCheckerScreen extends StatefulWidget {
   const SymptomCheckerScreen({super.key});
@@ -22,8 +28,6 @@ class SymptomCheckerScreen extends StatefulWidget {
 class _SymptomCheckerScreenState extends State<SymptomCheckerScreen> {
   final MedicalDataService _medicalService = MedicalDataService();
   final List<String> _selectedSymptoms = [];
-  List<String> _allSymptoms = [];
-  List<String> _filteredSymptoms = [];
   List<DiagnosticResult> _results = [];
   bool _isLoading = true;
   final TextEditingController _searchController = TextEditingController();
@@ -37,18 +41,12 @@ class _SymptomCheckerScreenState extends State<SymptomCheckerScreen> {
   Future<void> _loadData() async {
     await _medicalService.init();
     setState(() {
-      _allSymptoms = _medicalService.getAllSymptoms();
-      _filteredSymptoms = _allSymptoms;
       _isLoading = false;
     });
   }
 
   void _onSearchChanged(String query) {
-    setState(() {
-      _filteredSymptoms = _allSymptoms
-          .where((s) => s.toLowerCase().contains(query.toLowerCase()))
-          .toList();
-    });
+    setState(() {});
   }
 
   void _toggleSymptom(String symptom) {
@@ -62,16 +60,180 @@ class _SymptomCheckerScreenState extends State<SymptomCheckerScreen> {
     });
   }
 
-  void _runDiagnosis() {
+  void _runDiagnosis() async {
     if (_selectedSymptoms.isEmpty) return;
+
+    final riskLevel = evaluateRisk(_selectedSymptoms);
+
+    // Save to backend and local storage first
+    try {
+      final userId = AuthService.instance.getCurrentUserId();
+      if (userId != null) {
+        await MaaCareBackendService.instance.saveSymptomCheck(
+          userId: userId,
+          symptoms: _selectedSymptoms,
+          riskLevel: riskLevel,
+        );
+      }
+
+      // Save local logs for Health Insights screen
+      final prefs = await SharedPreferences.getInstance();
+      final weekday = ['Mon', 'Tue', 'Wed', 'Thu', 'Fri', 'Sat', 'Sun'][DateTime.now().weekday - 1];
+      
+      final symptomRaw = prefs.getString('insights_symptom_logs');
+      List<Map<String, dynamic>> logs = [];
+      if (symptomRaw != null) {
+        logs = List<Map<String, dynamic>>.from(jsonDecode(symptomRaw));
+      } else {
+        logs = [
+          {'date': 'Mon', 'count': 2},
+          {'date': 'Tue', 'count': 0},
+          {'date': 'Wed', 'count': 3},
+          {'date': 'Thu', 'count': 1},
+          {'date': 'Fri', 'count': 4},
+          {'date': 'Sat', 'count': 2},
+          {'date': 'Sun', 'count': 1},
+        ];
+      }
+
+      final todayIdx = logs.indexWhere((l) => l['date'] == weekday);
+      if (todayIdx != -1) {
+        logs[todayIdx]['count'] = (logs[todayIdx]['count'] as int) + 1;
+      }
+
+      await prefs.setString('insights_symptom_logs', jsonEncode(logs));
+    } catch (e) {
+      debugPrint('Failed to save symptom check: $e');
+    }
 
     setState(() {
       _results = _medicalService.diagnose(_selectedSymptoms);
     });
 
+    if (riskLevel == 'high' || riskLevel == 'medium') {
+      _showEmergencyTriageModal();
+      return;
+    }
+
     if (_results.isNotEmpty) {
       _showResultsModal();
     }
+  }
+
+  void _showEmergencyTriageModal() {
+    showDialog(
+      context: context,
+      barrierDismissible: false,
+      builder: (context) {
+        return PopScope(
+          canPop: false,
+          child: AlertDialog(
+            backgroundColor: MaaColors.cardDark,
+            shape: RoundedRectangleBorder(
+              borderRadius: BorderRadius.circular(24),
+              side: const BorderSide(color: Colors.redAccent, width: 2),
+            ),
+            title: const Row(
+              children: [
+                Icon(Icons.warning_amber_rounded, color: Colors.redAccent, size: 36),
+                SizedBox(width: 12),
+                Text(
+                  'Emergency Alert!',
+                  style: TextStyle(color: Colors.white, fontWeight: FontWeight.bold),
+                ),
+              ],
+            ),
+            content: Column(
+              mainAxisSize: MainAxisSize.min,
+              crossAxisAlignment: CrossAxisAlignment.start,
+              children: [
+                Text(
+                  'Critical / High-Risk Symptoms Detected!',
+                  style: GoogleFonts.poppins(
+                    fontSize: 16,
+                    fontWeight: FontWeight.w700,
+                    color: Colors.redAccent,
+                  ),
+                ),
+                const SizedBox(height: 12),
+                Text(
+                  'Aapke select kiye gaye symptoms serious ho sakte hain. Kripya turant apne doctor se sampark karein ya najdiki emergency room jaayein.',
+                  style: GoogleFonts.poppins(
+                    fontSize: 14,
+                    color: MaaColors.textPrimary,
+                    height: 1.5,
+                  ),
+                ),
+                const SizedBox(height: 16),
+                Text(
+                  'Emergency Services: 108\nAmbulance Services: 102',
+                  style: GoogleFonts.poppins(
+                    fontSize: 13,
+                    color: MaaColors.textSecondary,
+                    fontWeight: FontWeight.w600,
+                  ),
+                ),
+              ],
+            ),
+            actions: [
+              Padding(
+                padding: const EdgeInsets.only(bottom: 8.0, left: 8.0, right: 8.0),
+                child: Column(
+                  children: [
+                    ElevatedButton.icon(
+                      onPressed: () async {
+                        final uri = Uri.parse('tel:108');
+                        if (await canLaunchUrl(uri)) {
+                          await launchUrl(uri);
+                        }
+                      },
+                      style: ElevatedButton.styleFrom(
+                        backgroundColor: Colors.redAccent,
+                        foregroundColor: Colors.white,
+                        minimumSize: const Size(double.infinity, 48),
+                        shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(16)),
+                      ),
+                      icon: const Icon(Icons.phone_in_talk),
+                      label: Text('Call Emergency (108)', style: GoogleFonts.poppins(fontWeight: FontWeight.bold)),
+                    ),
+                    const SizedBox(height: 8),
+                    OutlinedButton.icon(
+                      onPressed: () async {
+                        final uri = Uri.parse('tel:102');
+                        if (await canLaunchUrl(uri)) {
+                          await launchUrl(uri);
+                        }
+                      },
+                      style: OutlinedButton.styleFrom(
+                        foregroundColor: MaaColors.pink,
+                        side: const BorderSide(color: MaaColors.pink),
+                        minimumSize: const Size(double.infinity, 48),
+                        shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(16)),
+                      ),
+                      icon: const Icon(Icons.local_hospital),
+                      label: Text('Call Ambulance (102)', style: GoogleFonts.poppins(fontWeight: FontWeight.bold)),
+                    ),
+                    const SizedBox(height: 12),
+                    TextButton(
+                      onPressed: () {
+                        Navigator.pop(context);
+                        if (_results.isNotEmpty) {
+                          _showResultsModal();
+                        }
+                      },
+                      child: Text(
+                        'Acknowledge & Close',
+                        style: GoogleFonts.poppins(color: MaaColors.textSecondary),
+                      ),
+                    ),
+                  ],
+                ),
+              ),
+            ],
+          ),
+        );
+      },
+    );
   }
 
   void _showResultsModal() {
@@ -199,13 +361,21 @@ class _SymptomCheckerScreenState extends State<SymptomCheckerScreen> {
   }
 
   Widget _buildSymptomList() {
-    if (_filteredSymptoms.isEmpty) {
+    final greenSymptoms = commonSymptoms.where((s) => s['risk'] == 'low').toList();
+    final yellowSymptoms = commonSymptoms.where((s) => s['risk'] == 'medium').toList();
+    final redSymptoms = commonSymptoms.where((s) => s['risk'] == 'high').toList();
+
+    final query = _searchController.text.toLowerCase();
+    final filteredGreen = greenSymptoms.where((s) => s['name'].toString().toLowerCase().contains(query)).toList();
+    final filteredYellow = yellowSymptoms.where((s) => s['name'].toString().toLowerCase().contains(query)).toList();
+    final filteredRed = redSymptoms.where((s) => s['name'].toString().toLowerCase().contains(query)).toList();
+
+    if (filteredGreen.isEmpty && filteredYellow.isEmpty && filteredRed.isEmpty) {
       return Center(
         child: Column(
           mainAxisAlignment: MainAxisAlignment.center,
           children: [
-            const Icon(Icons.search_off_rounded,
-                size: 64, color: MaaColors.textMuted),
+            const Icon(Icons.search_off_rounded, size: 64, color: MaaColors.textMuted),
             const SizedBox(height: 16),
             Text(
               'No symptoms found',
@@ -216,44 +386,130 @@ class _SymptomCheckerScreenState extends State<SymptomCheckerScreen> {
       );
     }
 
-    return ListView.builder(
-      padding: const EdgeInsets.all(10),
-      itemCount: _filteredSymptoms.length,
-      itemBuilder: (context, index) {
-        final symptom = _filteredSymptoms[index];
-        final isSelected = _selectedSymptoms.contains(symptom);
+    return SingleChildScrollView(
+      padding: const EdgeInsets.symmetric(horizontal: 20, vertical: 10),
+      child: Column(
+        children: [
+          if (filteredGreen.isNotEmpty) ...[
+            _buildZoneSection(
+              title: 'Common / Mild Symptoms (GREEN ZONE)',
+              color: MaaColors.success,
+              symptoms: filteredGreen,
+            ),
+            const SizedBox(height: 16),
+          ],
+          if (filteredYellow.isNotEmpty) ...[
+            _buildZoneSection(
+              title: 'High-Risk Warning Signs (YELLOW ZONE)',
+              color: MaaColors.warning,
+              symptoms: filteredYellow,
+            ),
+            const SizedBox(height: 16),
+          ],
+          if (filteredRed.isNotEmpty) ...[
+            _buildZoneSection(
+              title: 'Emergency Pregnancy Complications (CRITICAL RED ZONE)',
+              color: Colors.redAccent,
+              symptoms: filteredRed,
+            ),
+            const SizedBox(height: 16),
+          ],
+        ],
+      ),
+    );
+  }
 
-        return Card(
-          color: isSelected ? MaaColors.pink.withAlpha(20) : MaaColors.cardDark,
-          margin: const EdgeInsets.symmetric(vertical: 4, horizontal: 10),
-          shape: RoundedRectangleBorder(
-            borderRadius: BorderRadius.circular(12),
-            side: BorderSide(
-              color: isSelected ? MaaColors.pink : Colors.transparent,
-              width: 1,
-            ),
-          ),
-          child: ListTile(
-            title: Text(
-              symptom,
-              style: GoogleFonts.poppins(
-                fontSize: 14,
-                fontWeight: isSelected ? FontWeight.w600 : FontWeight.w400,
-                color: isSelected ? MaaColors.white : MaaColors.textPrimary,
+  Widget _buildZoneSection({
+    required String title,
+    required Color color,
+    required List<Map<String, dynamic>> symptoms,
+  }) {
+    return Container(
+      padding: const EdgeInsets.all(16),
+      decoration: BoxDecoration(
+        color: MaaColors.cardDark,
+        borderRadius: BorderRadius.circular(20),
+        border: Border.all(color: color.withAlpha(40)),
+      ),
+      child: Column(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
+          Row(
+            children: [
+              Container(
+                width: 12,
+                height: 12,
+                decoration: BoxDecoration(
+                  color: color,
+                  shape: BoxShape.circle,
+                  boxShadow: [
+                    BoxShadow(
+                      color: color.withAlpha(150),
+                      blurRadius: 6,
+                    ),
+                  ],
+                ),
               ),
-            ),
-            trailing: Checkbox(
-              value: isSelected,
-              onChanged: (_) => _toggleSymptom(symptom),
-              activeColor: MaaColors.pink,
-              checkColor: MaaColors.white,
-              shape: RoundedRectangleBorder(
-                  borderRadius: BorderRadius.circular(4)),
-            ),
-            onTap: () => _toggleSymptom(symptom),
+              const SizedBox(width: 10),
+              Expanded(
+                child: Text(
+                  title,
+                  style: GoogleFonts.poppins(
+                    fontSize: 14,
+                    fontWeight: FontWeight.w700,
+                    color: color,
+                  ),
+                ),
+              ),
+            ],
           ),
-        );
-      },
+          const SizedBox(height: 12),
+          ListView.builder(
+            shrinkWrap: true,
+            physics: const NeverScrollableScrollPhysics(),
+            itemCount: symptoms.length,
+            itemBuilder: (context, index) {
+              final symptom = symptoms[index];
+              final name = symptom['name'] as String;
+              final isSelected = _selectedSymptoms.contains(name);
+
+              return Card(
+                color: isSelected ? color.withAlpha(20) : MaaColors.cardDark.withAlpha(120),
+                margin: const EdgeInsets.symmetric(vertical: 4),
+                elevation: 0,
+                shape: RoundedRectangleBorder(
+                  borderRadius: BorderRadius.circular(12),
+                  side: BorderSide(
+                    color: isSelected ? color : Colors.transparent,
+                    width: 1,
+                  ),
+                ),
+                child: ListTile(
+                  dense: true,
+                  title: Text(
+                    name,
+                    style: GoogleFonts.poppins(
+                      fontSize: 13,
+                      fontWeight: isSelected ? FontWeight.w600 : FontWeight.w400,
+                      color: isSelected ? Colors.white : MaaColors.textPrimary,
+                    ),
+                  ),
+                  trailing: Checkbox(
+                    value: isSelected,
+                    onChanged: (_) => _toggleSymptom(name),
+                    activeColor: color,
+                    checkColor: Colors.white,
+                    shape: RoundedRectangleBorder(
+                      borderRadius: BorderRadius.circular(4),
+                    ),
+                  ),
+                  onTap: () => _toggleSymptom(name),
+                ),
+              );
+            },
+          ),
+        ],
+      ),
     );
   }
 
