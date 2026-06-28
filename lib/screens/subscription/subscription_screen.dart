@@ -12,6 +12,7 @@ import 'package:google_fonts/google_fonts.dart';
 import 'package:provider/provider.dart';
 import '../../app_theme.dart';
 import '../../constants.dart';
+import 'package:razorpay_flutter/razorpay_flutter.dart';
 import '../../providers/user_provider.dart';
 import '../../services/razorpay_web_service.dart';
 
@@ -39,15 +40,48 @@ class _SubscriptionScreenState extends State<SubscriptionScreen>
     'Megha from Pune just upgraded! 🚀',
   ];
 
+  late Razorpay _razorpay;
+
   @override
   void initState() {
     super.initState();
+    if (!kIsWeb) {
+      _razorpay = Razorpay();
+      _razorpay.on(Razorpay.EVENT_PAYMENT_SUCCESS, _handleMobilePaymentSuccess);
+      _razorpay.on(Razorpay.EVENT_PAYMENT_ERROR, _handleMobilePaymentError);
+    }
     _startTimer();
+  }
+
+  void _handleMobilePaymentSuccess(PaymentSuccessResponse response) async {
+    setState(() => _isProcessing = false);
+    final userProvider = context.read<UserProvider>();
+    final planTitle = _isAnnual ? 'Super Mom Annual 🏆' : 'Super Mom 👑';
+    await userProvider.markPremium(
+        planName: planTitle, paymentId: response.paymentId ?? 'mobile_success');
+    if (mounted) {
+      _showSuccessDialog(response.paymentId ?? 'mobile_success');
+    }
+  }
+
+  void _handleMobilePaymentError(PaymentFailureResponse response) {
+    setState(() => _isProcessing = false);
+    if (mounted) {
+      ScaffoldMessenger.of(context).showSnackBar(
+        SnackBar(
+          content: Text('Payment failed: ${response.message ?? "Unknown Error"}'),
+          backgroundColor: MaaColors.error,
+        ),
+      );
+    }
   }
 
   @override
   void dispose() {
     _timer?.cancel();
+    if (!kIsWeb) {
+      _razorpay.clear();
+    }
     super.dispose();
   }
 
@@ -164,13 +198,31 @@ class _SubscriptionScreenState extends State<SubscriptionScreen>
       );
     } else {
       // Mobile: Use razorpay_flutter package
-      setState(() => _isProcessing = false);
-      ScaffoldMessenger.of(context).showSnackBar(
-        const SnackBar(
-          content: Text('Please use the web app for payments'),
-          backgroundColor: MaaColors.softPurple,
-        ),
-      );
+      final options = {
+        'key': AppConstants.razorpayKey,
+        'amount': plan.price,
+        'currency': 'INR',
+        'name': 'MaaCare',
+        'description': plan.title,
+        'prefill': {
+          'email': user?.email ?? '',
+          'contact': user?.phone ?? '',
+        },
+      };
+
+      try {
+        _razorpay.open(options);
+      } catch (e) {
+        setState(() => _isProcessing = false);
+        if (mounted) {
+          ScaffoldMessenger.of(context).showSnackBar(
+            SnackBar(
+              content: Text('Failed to open payment gateway: $e'),
+              backgroundColor: MaaColors.error,
+            ),
+          );
+        }
+      }
     }
   }
 

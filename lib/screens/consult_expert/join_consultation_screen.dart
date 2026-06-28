@@ -2,7 +2,7 @@ import 'package:flutter/material.dart';
 import 'package:hms_room_kit/hms_room_kit.dart';
 import '../../app_theme.dart';
 import '../../models/booking_model.dart';
-import '../../services/insforge_service.dart';
+import '../../services/maacare_backend_service.dart';
 
 class JoinConsultationScreen extends StatefulWidget {
   final BookingModel appointment;
@@ -45,21 +45,28 @@ class _JoinConsultationScreenState extends State<JoinConsultationScreen> {
   }
 
   void _handleCallEnded() async {
-    Navigator.of(context).pop(); // Exit HMS Prebuilt Screen
-
     // Mark appointment as 'completed' in backend
     try {
-      await InsForgeService.instance.updateAppointmentStatus(
+      await MaaCareBackendService.instance.updateAppointmentStatus(
         widget.appointment.id,
         'completed',
       );
     } catch (e) {
       debugPrint('Failed to mark complete: $e');
     }
+
     if (!mounted) return;
-    
+
+    // Pop the HMS screen if it pushed itself
+    if (Navigator.of(context).canPop()) {
+      Navigator.of(context).pop();
+    }
+
+    if (!mounted) return;
+
     showDialog(
       context: context,
+      barrierDismissible: false,
       builder: (_) => AlertDialog(
         backgroundColor: MaaColors.cardDark,
         title: const Text('Consultation Finished', style: TextStyle(color: MaaColors.white)),
@@ -70,9 +77,14 @@ class _JoinConsultationScreenState extends State<JoinConsultationScreen> {
         actions: [
           TextButton(
             onPressed: () {
-              Navigator.pop(context); // Close dialog
+              // Close dialog then navigate cleanly home — removes all screens from stack
+              Navigator.of(context).pop();
+              Navigator.of(context).pushNamedAndRemoveUntil(
+                '/home',
+                (route) => false,
+              );
             },
-            child: const Text('Back to Dashboard', style: TextStyle(color: MaaColors.pink)),
+            child: const Text('Back to Home', style: TextStyle(color: MaaColors.pink)),
           )
         ],
       ),

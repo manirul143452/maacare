@@ -15,7 +15,15 @@ class UserModel {
   final String language;
   final bool isPremium;
   final String? premiumPlan;
+  final String userRole;
+  final int? trimester;
+  final String? ageBracket;
   final DateTime createdAt;
+  final String? fcmToken;
+  final String? onesignalPlayerId;
+  final double? heightCm;
+  final double? weightKg;
+  final int trialUsesLeft;
 
   const UserModel({
     required this.id,
@@ -30,7 +38,15 @@ class UserModel {
     this.language = 'en',
     this.isPremium = false,
     this.premiumPlan,
+    this.userRole = '',
+    this.trimester,
+    this.ageBracket,
     required this.createdAt,
+    this.fcmToken,
+    this.onesignalPlayerId,
+    this.heightCm,
+    this.weightKg,
+    this.trialUsesLeft = 10,
   });
 
   /// Weeks of pregnancy elapsed (based on due date – 40 weeks).
@@ -62,6 +78,14 @@ class UserModel {
     String? language,
     bool? isPremium,
     String? premiumPlan,
+    String? userRole,
+    int? trimester,
+    String? ageBracket,
+    String? fcmToken,
+    String? onesignalPlayerId,
+    double? heightCm,
+    double? weightKg,
+    int? trialUsesLeft,
   }) {
     return UserModel(
       id: id,
@@ -76,7 +100,15 @@ class UserModel {
       language: language ?? this.language,
       isPremium: isPremium ?? this.isPremium,
       premiumPlan: premiumPlan ?? this.premiumPlan,
+      userRole: userRole ?? this.userRole,
+      trimester: trimester ?? this.trimester,
+      ageBracket: ageBracket ?? this.ageBracket,
       createdAt: createdAt,
+      fcmToken: fcmToken ?? this.fcmToken,
+      onesignalPlayerId: onesignalPlayerId ?? this.onesignalPlayerId,
+      heightCm: heightCm ?? this.heightCm,
+      weightKg: weightKg ?? this.weightKg,
+      trialUsesLeft: trialUsesLeft ?? this.trialUsesLeft,
     );
   }
 
@@ -92,12 +124,20 @@ class UserModel {
       mood: map['mood'] as String?,
       points: (map['points'] as int?) ?? 0,
       streak: (map['streak'] as int?) ?? 0,
-      avatarUrl: map['avatar_url'] as String?,
+      avatarUrl: map['profile_photo_url'] as String? ?? map['avatar_url'] as String?,
       language: (map['language'] as String?) ?? 'en',
       isPremium: (map['is_premium'] as bool?) ?? false,
       premiumPlan: map['premium_plan'] as String?,
+      userRole: (map['user_role'] as String?) ?? '',
+      trimester: map['trimester'] as int?,
+      ageBracket: map['age_bracket'] as String?,
       createdAt: DateTime.parse(
           (map['created_at'] as String?) ?? DateTime.now().toIso8601String()),
+      fcmToken: map['fcm_token'] as String?,
+      onesignalPlayerId: map['onesignal_player_id'] as String?,
+      heightCm: (map['height_cm'] as num?)?.toDouble(),
+      weightKg: (map['weight_kg'] as num?)?.toDouble(),
+      trialUsesLeft: (map['trial_uses_left'] as int?) ?? 10,
     );
   }
 
@@ -112,9 +152,18 @@ class UserModel {
       'points': points,
       'streak': streak,
       'avatar_url': avatarUrl,
+      'profile_photo_url': avatarUrl,
       'language': language,
       'is_premium': isPremium,
       if (premiumPlan != null) 'premium_plan': premiumPlan,
+      'user_role': userRole,
+      if (trimester != null) 'trimester': trimester,
+      if (ageBracket != null) 'age_bracket': ageBracket,
+      if (fcmToken != null) 'fcm_token': fcmToken,
+      if (onesignalPlayerId != null) 'onesignal_player_id': onesignalPlayerId,
+      if (heightCm != null) 'height_cm': heightCm,
+      if (weightKg != null) 'weight_kg': weightKg,
+      'trial_uses_left': trialUsesLeft,
     };
   }
 }

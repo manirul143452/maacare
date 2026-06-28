@@ -12,7 +12,7 @@ import '../../widgets/maa_button.dart';
 import '../../providers/user_provider.dart';
 import '../../providers/locale_provider.dart';
 import '../../providers/theme_provider.dart';
-import '../../l10n/app_localizations.dart';
+import 'package:flutter_gen/gen_l10n/app_localizations.dart';
 
 class SettingsScreen extends StatefulWidget {
   const SettingsScreen({super.key});
@@ -151,6 +151,23 @@ class _SettingsScreenState extends State<SettingsScreen> {
                     width: 40,
                     height: 40,
                     decoration: BoxDecoration(
+                      gradient: const LinearGradient(colors: [Colors.orange, Colors.amber]),
+                      borderRadius: BorderRadius.circular(12),
+                    ),
+                    child: const Icon(Icons.help_outline_rounded, color: Colors.white, size: 20),
+                  ),
+                  title: Text(l10n.helpCenterSupport,
+                      style: GoogleFonts.poppins(fontWeight: FontWeight.w600, fontSize: 15)),
+                  trailing: const Icon(Icons.chevron_right_rounded),
+                  onTap: () => Navigator.pushNamed(context, '/help'),
+                  contentPadding: const EdgeInsets.symmetric(horizontal: 16, vertical: 4),
+                ),
+                const Divider(height: 1, indent: 72),
+                ListTile(
+                  leading: Container(
+                    width: 40,
+                    height: 40,
+                    decoration: BoxDecoration(
                       gradient: const LinearGradient(colors: [MaaColors.pink, MaaColors.pinkDark]),
                       borderRadius: BorderRadius.circular(12),
                     ),
@@ -270,75 +287,102 @@ class _SettingsScreenState extends State<SettingsScreen> {
   void _showLanguagePicker(BuildContext context, LocaleProvider localeProvider, AppLocalizations l10n) {
     showModalBottomSheet(
       context: context,
+      isScrollControlled: true,           // lets sheet grow taller
+      backgroundColor: Colors.transparent,
       shape: const RoundedRectangleBorder(
         borderRadius: BorderRadius.vertical(top: Radius.circular(28)),
       ),
       builder: (_) {
-        return Padding(
-          padding: const EdgeInsets.symmetric(vertical: 16),
-          child: Column(
-            mainAxisSize: MainAxisSize.min,
-            children: [
-              Container(
-                width: 40,
-                height: 4,
-                margin: const EdgeInsets.only(bottom: 16),
-                decoration: BoxDecoration(
-                  color: Colors.grey.withAlpha(100),
-                  borderRadius: BorderRadius.circular(2),
-                ),
+        return DraggableScrollableSheet(
+          initialChildSize: 0.60,          // 60% of screen height by default
+          minChildSize: 0.40,
+          maxChildSize: 0.88,
+          expand: false,
+          builder: (_, scrollCtrl) {
+            return Container(
+              decoration: BoxDecoration(
+                color: Theme.of(context).cardTheme.color ??
+                    Theme.of(context).scaffoldBackgroundColor,
+                borderRadius:
+                    const BorderRadius.vertical(top: Radius.circular(28)),
               ),
-              Text(
-                l10n.selectLanguage,
-                style: GoogleFonts.poppins(fontSize: 18, fontWeight: FontWeight.w600),
-              ),
-              const SizedBox(height: 8),
-              ...LocaleProvider.codeToName.entries.map((entry) {
-                final isSelected = localeProvider.locale.languageCode == entry.key;
-                return ListTile(
-                  leading: Text(
-                    _langFlag(entry.key),
-                    style: const TextStyle(fontSize: 24),
-                  ),
-                  title: Text(
-                    entry.value,
-                    style: GoogleFonts.poppins(
-                      fontWeight: isSelected ? FontWeight.w700 : FontWeight.w400,
-                      fontSize: 15,
+              child: Column(
+                children: [
+                  // ── Drag handle ──────────────────────────────────────────
+                  const SizedBox(height: 12),
+                  Container(
+                    width: 40,
+                    height: 4,
+                    decoration: BoxDecoration(
+                      color: Colors.grey.withAlpha(120),
+                      borderRadius: BorderRadius.circular(2),
                     ),
                   ),
-                  trailing: isSelected
-                      ? Icon(Icons.check_circle_rounded,
-                          color: Theme.of(context).colorScheme.primary)
-                      : null,
-                  onTap: () {
-                    localeProvider.setLocaleByCode(entry.key);
-                    Navigator.pop(context);
-                  },
-                );
-              }),
-              const SizedBox(height: 16),
-            ],
-          ),
+                  const SizedBox(height: 14),
+                  Text(
+                    l10n.selectLanguage,
+                    style: GoogleFonts.poppins(
+                        fontSize: 18, fontWeight: FontWeight.w600),
+                  ),
+                  const SizedBox(height: 8),
+                  const Divider(height: 1),
+                  // ── Scrollable language list ─────────────────────────────
+                  Expanded(
+                    child: ListView.separated(
+                      controller: scrollCtrl,
+                      padding: const EdgeInsets.symmetric(vertical: 8),
+                      itemCount: LocaleProvider.supportedLanguages.length,
+                      separatorBuilder: (_, __) =>
+                          const Divider(height: 1, indent: 60),
+                      itemBuilder: (ctx, i) {
+                        final lang = LocaleProvider.supportedLanguages[i];
+                        final isSelected =
+                            localeProvider.locale.languageCode == lang.code;
+                        return ListTile(
+                          leading: Text(
+                            lang.flag,
+                            style: const TextStyle(fontSize: 26),
+                          ),
+                          title: Text(
+                            lang.nativeName,
+                            style: GoogleFonts.poppins(
+                              fontWeight: isSelected
+                                  ? FontWeight.w700
+                                  : FontWeight.w400,
+                              fontSize: 15,
+                            ),
+                          ),
+                          subtitle: Text(
+                            lang.englishName,
+                            style: GoogleFonts.poppins(
+                              fontSize: 11,
+                              color: Colors.grey,
+                            ),
+                          ),
+                          trailing: isSelected
+                              ? Icon(Icons.check_circle_rounded,
+                                  color:
+                                      Theme.of(context).colorScheme.primary)
+                              : const Icon(Icons.chevron_right_rounded,
+                                  color: Colors.grey, size: 20),
+                          onTap: () {
+                            localeProvider.setLocaleByCode(lang.code);
+                            Navigator.pop(context);
+                          },
+                        );
+                      },
+                    ),
+                  ),
+                ],
+              ),
+            );
+          },
         );
       },
     );
   }
 
-  String _langFlag(String code) {
-    switch (code) {
-      case 'en':
-        return '🇬🇧';
-      case 'hi':
-        return '🇮🇳';
-      case 'as':
-        return '🏔️';
-      case 'bn':
-        return '🇧🇩';
-      default:
-        return '🌐';
-    }
-  }
+
 
   Future<void> _handleSignOut(BuildContext context, AppLocalizations l10n) async {
     final confirmed = await showDialog<bool>(

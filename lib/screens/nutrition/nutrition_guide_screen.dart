@@ -8,6 +8,7 @@ import 'package:flutter/material.dart';
 import 'package:cached_network_image/cached_network_image.dart';
 import '../../app_theme.dart';
 import 'bmi_calculator_screen.dart';
+import 'package:flutter_gen/gen_l10n/app_localizations.dart';
 
 // ─────────────────────────────────────────────
 // Data Models
@@ -350,7 +351,7 @@ class _NutritionGuideScreenState extends State<NutritionGuideScreen>
   Widget build(BuildContext context) {
     return Scaffold(
       appBar: AppBar(
-        title: const Text('Nutrition Guide 🍱'),
+        title: Text(AppLocalizations.of(context).nutritionGuide),
         bottom: TabBar(
           controller: _tabController,
           labelColor: MaaColors.deepPink,
@@ -571,20 +572,20 @@ class _NutritionGuideScreenState extends State<NutritionGuideScreen>
                   borderRadius: BorderRadius.circular(20),
                   boxShadow: [
                     BoxShadow(
-                        color: MaaColors.pink.withOpacity(0.3),
+                        color: MaaColors.pink.withValues(alpha: 0.3),
                         blurRadius: 10,
                         offset: const Offset(0, 4))
                   ]),
-              child: const Column(
+              child: Column(
                 crossAxisAlignment: CrossAxisAlignment.start,
                 children: [
-                  Text('Get Personal AI Nutrition Plan!',
-                      style: TextStyle(
+                  Text(AppLocalizations.of(context).personalAiNutritionPlan,
+                      style: const TextStyle(
                           color: MaaColors.white,
                           fontSize: 18,
                           fontWeight: FontWeight.bold)),
-                  SizedBox(height: 8),
-                  Text('For your entire family. Just 2 mins! 🔥',
+                  const SizedBox(height: 8),
+                  const Text('For your entire family. Just 2 mins! 🔥',
                       style: TextStyle(color: MaaColors.white, fontSize: 14)),
                 ],
               ),

@@ -107,12 +107,12 @@ class AuthService {
 
 
     try {
-      final url = Uri.parse('${AppConstants.insForgeUrl}/api/auth/sessions');
+      final url = Uri.parse('${AppConstants.backendUrl}/api/auth/sessions');
       final response = await http.post(
         url,
         headers: {
           'Content-Type': 'application/json',
-          'Authorization': 'Bearer ${AppConstants.insForgeAnonKey}',
+          'Authorization': 'Bearer ${AppConstants.backendAnonKey}',
         },
         body: jsonEncode({
           'email': email.trim(),
@@ -155,12 +155,12 @@ class AuthService {
   }) async {
     try {
       // Use Railway Express backend for signup
-      final url = Uri.parse('${AppConstants.insForgeUrl}/api/auth/users');
+      final url = Uri.parse('${AppConstants.backendUrl}/api/auth/users');
       final response = await http.post(
         url,
         headers: {
           'Content-Type': 'application/json',
-          'Authorization': 'Bearer ${AppConstants.insForgeAnonKey}',
+          'Authorization': 'Bearer ${AppConstants.backendAnonKey}',
         },
         body: jsonEncode({
           'email': email.trim(),
@@ -204,12 +204,12 @@ class AuthService {
   /// Send password reset code to user's email
   Future<AuthResult> sendResetPasswordEmail({required String email}) async {
     try {
-      final url = Uri.parse('${AppConstants.insForgeUrl}/api/auth/email/send-reset-password');
+      final url = Uri.parse('${AppConstants.backendUrl}/api/auth/email/send-reset-password');
       final response = await http.post(
         url,
         headers: {
           'Content-Type': 'application/json',
-          'Authorization': 'Bearer ${AppConstants.insForgeAnonKey}',
+          'Authorization': 'Bearer ${AppConstants.backendAnonKey}',
         },
         body: jsonEncode({
           'email': email.trim(),
@@ -233,12 +233,12 @@ class AuthService {
     required String code,
   }) async {
     try {
-      final url = Uri.parse('${AppConstants.insForgeUrl}/api/auth/email/exchange-reset-password-token');
+      final url = Uri.parse('${AppConstants.backendUrl}/api/auth/email/exchange-reset-password-token');
       final response = await http.post(
         url,
         headers: {
           'Content-Type': 'application/json',
-          'Authorization': 'Bearer ${AppConstants.insForgeAnonKey}',
+          'Authorization': 'Bearer ${AppConstants.backendAnonKey}',
         },
         body: jsonEncode({
           'email': email.trim(),
@@ -267,12 +267,12 @@ class AuthService {
     required String token,
   }) async {
     try {
-      final url = Uri.parse('${AppConstants.insForgeUrl}/api/auth/email/reset-password');
+      final url = Uri.parse('${AppConstants.backendUrl}/api/auth/email/reset-password');
       final response = await http.post(
         url,
         headers: {
           'Content-Type': 'application/json',
-          'Authorization': 'Bearer ${AppConstants.insForgeAnonKey}',
+          'Authorization': 'Bearer ${AppConstants.backendAnonKey}',
         },
         body: jsonEncode({
           'newPassword': newPassword.trim(),
@@ -320,7 +320,7 @@ class AuthService {
 
         // Send Google credentials to our backend to get a JWT
         final response = await http.post(
-          Uri.parse('${AppConstants.insForgeUrl}/api/auth/google/token'),
+          Uri.parse('${AppConstants.backendUrl}/api/auth/google/token'),
           headers: {'Content-Type': 'application/json'},
           body: jsonEncode({
             'idToken': googleAuth.idToken,
@@ -368,7 +368,7 @@ class AuthService {
 
     const redirectUri = 'maacare://auth/callback';
 
-    final authUrl = Uri.parse('${AppConstants.insForgeUrl}/api/auth/oauth/$provider')
+    final authUrl = Uri.parse('${AppConstants.backendUrl}/api/auth/oauth/$provider')
         .replace(queryParameters: {
       'redirect_uri': redirectUri,
       'code_challenge': codeChallenge,
@@ -411,7 +411,7 @@ class AuthService {
     final currentUrl = Uri.base.toString();
     final redirectUri = currentUrl.split('#')[0].split('?')[0];
 
-    final authUrl = Uri.parse('${AppConstants.insForgeUrl}/api/auth/oauth/$provider')
+    final authUrl = Uri.parse('${AppConstants.backendUrl}/api/auth/oauth/$provider')
         .replace(queryParameters: {
       'redirect_uri': redirectUri,
       'code_challenge': codeChallenge,
@@ -445,12 +445,12 @@ class AuthService {
       final codeVerifier = await SecureStorageService.instance.read('oauth_code_verifier');
       if (codeVerifier == null) return AuthResult.error('No code verifier found in storage');
 
-      final url = Uri.parse('${AppConstants.insForgeUrl}/api/auth/oauth/exchange?client_type=web');
+      final url = Uri.parse('${AppConstants.backendUrl}/api/auth/oauth/exchange?client_type=web');
       final response = await http.post(
         url,
         headers: {
           'Content-Type': 'application/json',
-          'Authorization': 'Bearer ${AppConstants.insForgeAnonKey}',
+          'Authorization': 'Bearer ${AppConstants.backendAnonKey}',
         },
         body: jsonEncode({
           'code': code,
@@ -516,13 +516,13 @@ class AuthService {
   Future<AuthResult> _insForgeOAuthLogin(String provider, String idToken) async {
     try {
       // Endpoint to exchange OAuth ID token for an InsForge session
-      final url = Uri.parse('${AppConstants.insForgeUrl}/api/auth/token?grant_type=id_token');
+      final url = Uri.parse('${AppConstants.backendUrl}/api/auth/token?grant_type=id_token');
       
       final response = await http.post(
         url,
         headers: {
           'Content-Type': 'application/json',
-          'Authorization': 'Bearer ${AppConstants.insForgeAnonKey}',
+          'Authorization': 'Bearer ${AppConstants.backendAnonKey}',
         },
         body: jsonEncode({
           'provider': provider,
@@ -591,12 +591,12 @@ class AuthService {
       
       if (storedRefreshToken != null) {
         // Refresh token via proper endpoint
-        final url = Uri.parse('${AppConstants.insForgeUrl}/api/auth/token?grant_type=refresh_token');
+        final url = Uri.parse('${AppConstants.backendUrl}/api/auth/token?grant_type=refresh_token');
         final response = await http.post(
           url,
           headers: {
             'Content-Type': 'application/json',
-            'Authorization': 'Bearer ${AppConstants.insForgeAnonKey}',
+            'Authorization': 'Bearer ${AppConstants.backendAnonKey}',
           },
           body: jsonEncode({
             'refresh_token': storedRefreshToken,
@@ -617,7 +617,7 @@ class AuthService {
       
       // Fallback: try to refresh using current session endpoint if refresh_token failed/missing
       if (_shouldRefreshToken(_accessToken!)) {
-        final url = Uri.parse('${AppConstants.insForgeUrl}/api/auth/sessions/current');
+        final url = Uri.parse('${AppConstants.backendUrl}/api/auth/sessions/current');
         final response = await http.get(
           url,
           headers: {
@@ -720,7 +720,7 @@ class AuthService {
   Map<String, String> getAuthHeaders() {
     return {
       'Content-Type': 'application/json',
-      'Authorization': 'Bearer ${_accessToken ?? AppConstants.insForgeAnonKey}',
+      'Authorization': 'Bearer ${_accessToken ?? AppConstants.backendAnonKey}',
     };
   }
 

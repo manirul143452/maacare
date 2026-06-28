@@ -4,6 +4,7 @@ import 'package:flutter_animate/flutter_animate.dart';
 import '../../app_theme.dart';
 import '../../models/doctor_model.dart';
 import '../../widgets/maa_button.dart';
+import '../../widgets/booking_checkout_sheet.dart';
 
 class DoctorProfileScreen extends StatelessWidget {
   final DoctorModel doctor;
@@ -258,9 +259,7 @@ class DoctorProfileScreen extends StatelessWidget {
       ),
       child: MaaButton(
         label: 'Book Video Consultation',
-        onPressed: () {
-          // Booking logic
-        },
+        onPressed: () => BookingCheckoutSheet.show(context, doctor),
         icon: Icons.videocam_rounded,
       ),
     );

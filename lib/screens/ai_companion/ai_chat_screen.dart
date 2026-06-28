@@ -2,12 +2,16 @@ import 'package:flutter/material.dart';
 import 'package:provider/provider.dart';
 import 'package:flutter_animate/flutter_animate.dart';
 import 'package:image_picker/image_picker.dart';
+import 'package:google_fonts/google_fonts.dart';
 import '../../app_theme.dart';
 import '../../models/chat_message_model.dart';
 import '../../providers/chat_provider.dart';
 import '../../providers/user_provider.dart';
-import '../../services/insforge_service.dart';
+import '../../services/maacare_backend_service.dart';
 import '../../providers/community_provider.dart'; // Reuse for uploadMedia
+import '../../widgets/premium_paywall_sheet.dart';
+import 'package:url_launcher/url_launcher.dart';
+import 'package:flutter_gen/gen_l10n/app_localizations.dart';
 
 class AiChatScreen extends StatefulWidget {
   const AiChatScreen({super.key});
@@ -24,6 +28,8 @@ class _AiChatScreenState extends State<AiChatScreen> {
   @override
   void initState() {
     super.initState();
+    final chatProvider = context.read<ChatProvider>();
+    chatProvider.addListener(_chatProviderListener);
     WidgetsBinding.instance.addPostFrameCallback((_) {
       final userId = context.read<UserProvider>().user?.id ?? '';
       if (userId.isNotEmpty) {
@@ -43,9 +49,148 @@ class _AiChatScreenState extends State<AiChatScreen> {
 
   @override
   void dispose() {
+    context.read<ChatProvider>().removeListener(_chatProviderListener);
     _inputController.dispose();
     _scrollController.dispose();
     super.dispose();
+  }
+
+  bool _paywallShown = false;
+
+  void _chatProviderListener() {
+    final chatProvider = context.read<ChatProvider>();
+    final userProvider = context.read<UserProvider>();
+    final isPremium = userProvider.user?.isPremium ?? false;
+
+    if (chatProvider.isEmergencyTriage) {
+      final message = chatProvider.triageMessage ?? 'Emergency detected!';
+      chatProvider.clearEmergencyTriage();
+      _showEmergencyTriageModal(message);
+    }
+    if (chatProvider.isPaywallGateTriggered) {
+      chatProvider.clearPaywallGate();
+      PremiumPaywallSheet.show(context, message: "You've successfully tested your 5 Free AI Consultations. Upgrade to MaaCare Elite Pass for continuous, personalized guidance.");
+    }
+
+    if (!isPremium && chatProvider.freeAiChatCount >= 5 && !_paywallShown) {
+      _paywallShown = true;
+      WidgetsBinding.instance.addPostFrameCallback((_) {
+        PremiumPaywallSheet.show(context, message: "You've successfully tested your 5 Free AI Consultations. Upgrade to MaaCare Elite Pass for continuous, personalized guidance.");
+      });
+    }
+  }
+
+  void _showEmergencyTriageModal(String message) {
+    showDialog(
+      context: context,
+      barrierDismissible: false,
+      builder: (context) {
+        return PopScope(
+          canPop: false,
+          child: AlertDialog(
+            backgroundColor: MaaColors.cardDark,
+            shape: RoundedRectangleBorder(
+              borderRadius: BorderRadius.circular(24),
+              side: const BorderSide(color: Colors.redAccent, width: 2),
+            ),
+            title: const Row(
+              children: [
+                Icon(Icons.warning_amber_rounded, color: Colors.redAccent, size: 36),
+                SizedBox(width: 12),
+                Text(
+                  'Emergency Alert!',
+                  style: TextStyle(color: Colors.white, fontWeight: FontWeight.bold),
+                ),
+              ],
+            ),
+            content: Column(
+              mainAxisSize: MainAxisSize.min,
+              crossAxisAlignment: CrossAxisAlignment.start,
+              children: [
+                Text(
+                  'Critical / High-Risk Symptoms Detected!',
+                  style: GoogleFonts.poppins(
+                    fontSize: 16,
+                    fontWeight: FontWeight.w700,
+                    color: Colors.redAccent,
+                  ),
+                ),
+                const SizedBox(height: 12),
+                Text(
+                  message,
+                  style: GoogleFonts.poppins(
+                    fontSize: 14,
+                    color: MaaColors.textPrimary,
+                    height: 1.5,
+                  ),
+                ),
+                const SizedBox(height: 16),
+                Text(
+                  'Emergency Services: 108\nAmbulance Services: 102',
+                  style: GoogleFonts.poppins(
+                    fontSize: 13,
+                    color: MaaColors.textSecondary,
+                    fontWeight: FontWeight.w600,
+                  ),
+                ),
+              ],
+            ),
+            actions: [
+              Padding(
+                padding: const EdgeInsets.only(bottom: 8.0, left: 8.0, right: 8.0),
+                child: Column(
+                  children: [
+                    ElevatedButton.icon(
+                      onPressed: () async {
+                        final uri = Uri.parse('tel:108');
+                        if (await canLaunchUrl(uri)) {
+                          await launchUrl(uri);
+                        }
+                      },
+                      style: ElevatedButton.styleFrom(
+                        backgroundColor: Colors.redAccent,
+                        foregroundColor: Colors.white,
+                        minimumSize: const Size(double.infinity, 48),
+                        shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(16)),
+                      ),
+                      icon: const Icon(Icons.phone_in_talk),
+                      label: Text('Call Emergency (108)', style: GoogleFonts.poppins(fontWeight: FontWeight.bold)),
+                    ),
+                    const SizedBox(height: 8),
+                    OutlinedButton.icon(
+                      onPressed: () async {
+                        final uri = Uri.parse('tel:102');
+                        if (await canLaunchUrl(uri)) {
+                          await launchUrl(uri);
+                        }
+                      },
+                      style: OutlinedButton.styleFrom(
+                        foregroundColor: MaaColors.pink,
+                        side: const BorderSide(color: MaaColors.pink),
+                        minimumSize: const Size(double.infinity, 48),
+                        shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(16)),
+                      ),
+                      icon: const Icon(Icons.local_hospital),
+                      label: Text('Call Ambulance (102)', style: GoogleFonts.poppins(fontWeight: FontWeight.bold)),
+                    ),
+                    const SizedBox(height: 12),
+                    TextButton(
+                      onPressed: () {
+                        Navigator.pop(context);
+                      },
+                      child: Text(
+                        'Acknowledge & Close',
+                        style: GoogleFonts.poppins(color: MaaColors.textSecondary),
+                      ),
+                    ),
+                  ],
+                ),
+              ),
+            ],
+          ),
+        );
+      },
+    );
   }
 
   void _scrollToBottom() {
@@ -61,6 +206,15 @@ class _AiChatScreenState extends State<AiChatScreen> {
   }
 
   Future<void> _pickAndSendImage() async {
+    final userProvider = context.read<UserProvider>();
+    final isPremium = userProvider.user?.isPremium ?? false;
+    final chatProvider = context.read<ChatProvider>();
+    
+    if (!isPremium && chatProvider.freeAiChatCount >= 5) {
+      PremiumPaywallSheet.show(context, message: "You've successfully tested your 5 Free AI Consultations. Upgrade to MaaCare Elite Pass for continuous, personalized guidance.");
+      return;
+    }
+
     final picker = ImagePicker();
     final file = await picker.pickImage(source: ImageSource.gallery);
     if (file == null) return;
@@ -91,12 +245,21 @@ class _AiChatScreenState extends State<AiChatScreen> {
   }
 
   Future<void> _sendMessage() async {
+    final userProvider = context.read<UserProvider>();
+    final isPremium = userProvider.user?.isPremium ?? false;
+    final chatProvider = context.read<ChatProvider>();
+    
+    if (!isPremium && chatProvider.freeAiChatCount >= 5) {
+      PremiumPaywallSheet.show(context, message: "You've successfully tested your 5 Free AI Consultations. Upgrade to MaaCare Elite Pass for continuous, personalized guidance.");
+      return;
+    }
+
     final text = _inputController.text.trim();
     if (text.isEmpty) return;
 
     _inputController.clear();
-    final userId = context.read<UserProvider>().user?.id ?? 'guest';
-    await context.read<ChatProvider>().sendMessage(
+    final userId = userProvider.user?.id ?? 'guest';
+    await chatProvider.sendMessage(
           userId: userId,
           text: text,
         );
@@ -107,7 +270,7 @@ class _AiChatScreenState extends State<AiChatScreen> {
   Widget build(BuildContext context) {
     return Scaffold(
       appBar: AppBar(
-        title: const Text('Maa AI Chat'),
+        title: Text(AppLocalizations.of(context).maaAiChat),
         actions: [
           PopupMenuButton<String>(
             onSelected: (val) {
@@ -124,8 +287,8 @@ class _AiChatScreenState extends State<AiChatScreen> {
               }
             },
             itemBuilder: (ctx) => [
-              const PopupMenuItem(value: 'clear', child: Text('Clear History')),
-              const PopupMenuItem(value: 'delete', child: Text('Delete Chat')),
+              PopupMenuItem(value: 'clear', child: Text(AppLocalizations.of(context).clearHistory)),
+              PopupMenuItem(value: 'delete', child: Text(AppLocalizations.of(context).deleteChat)),
             ],
           ),
         ],
@@ -141,7 +304,14 @@ class _AiChatScreenState extends State<AiChatScreen> {
                       child:
                           CircularProgressIndicator(color: MaaColors.deepPink));
                 }
-                _scrollToBottom();
+                // Schedule scroll AFTER build, never inside builder
+                WidgetsBinding.instance.addPostFrameCallback((_) {
+                  if (_scrollController.hasClients) {
+                    _scrollController.jumpTo(
+                      _scrollController.position.maxScrollExtent,
+                    );
+                  }
+                });
                 return ListView.builder(
                   controller: _scrollController,
                   padding: const EdgeInsets.all(16),
@@ -199,8 +369,8 @@ class _AiChatScreenState extends State<AiChatScreen> {
           ListTile(
             leading:
                 const Icon(Icons.add_circle_outline, color: MaaColors.deepPink),
-            title: const Text('New Conversation',
-                style: TextStyle(fontWeight: FontWeight.bold)),
+            title: Text(AppLocalizations.of(context).newConversation,
+                style: const TextStyle(fontWeight: FontWeight.bold)),
             onTap: () {
               if (user != null) chatProvider.createNewConversation(user.id);
               Navigator.pop(context);
@@ -234,7 +404,7 @@ class _AiChatScreenState extends State<AiChatScreen> {
             leading: const Icon(Icons.logout_rounded),
             title: const Text('Sign Out'),
             onTap: () async {
-              await InsForgeService.instance.signOut();
+              await MaaCareBackendService.instance.signOut();
               if (mounted) Navigator.pushReplacementNamed(context, '/splash');
             },
           ),
@@ -244,6 +414,11 @@ class _AiChatScreenState extends State<AiChatScreen> {
   }
 
   Widget _buildInputBar() {
+    final userProvider = context.watch<UserProvider>();
+    final isPremium = userProvider.user?.isPremium ?? false;
+    final chatProvider = context.watch<ChatProvider>();
+    final isLocked = !isPremium && chatProvider.freeAiChatCount >= 5;
+
     return Container(
       padding: const EdgeInsets.fromLTRB(16, 8, 16, 16),
       decoration: BoxDecoration(
@@ -259,30 +434,31 @@ class _AiChatScreenState extends State<AiChatScreen> {
         children: [
           IconButton(
             icon: const Icon(Icons.image_outlined, color: MaaColors.deepPink),
-            onPressed: _isUploading ? null : _pickAndSendImage,
+            onPressed: (isLocked || _isUploading) ? null : _pickAndSendImage,
           ),
           Expanded(
             child: TextField(
               controller: _inputController,
-              decoration: const InputDecoration(
-                hintText: 'Type your message... 💕',
-                border: OutlineInputBorder(
+              enabled: !isLocked,
+              decoration: InputDecoration(
+                hintText: isLocked 
+                    ? 'Limit reached. Upgrade to Premium... 🔒' 
+                    : 'Type your message... 💕',
+                border: const OutlineInputBorder(
                     borderRadius: BorderRadius.all(Radius.circular(24))),
                 contentPadding:
-                    EdgeInsets.symmetric(horizontal: 20, vertical: 12),
+                    const EdgeInsets.symmetric(horizontal: 20, vertical: 12),
               ),
-              onSubmitted: (_) => _sendMessage(),
+              onSubmitted: (_) => isLocked ? null : _sendMessage(),
               maxLines: null,
               textInputAction: TextInputAction.send,
             ),
           ),
           const SizedBox(width: 8),
-          Consumer<ChatProvider>(
-            builder: (_, cp, __) => IconButton(
-              icon: Icon(Icons.send_rounded,
-                  color: cp.isTyping ? MaaColors.pink : MaaColors.deepPink),
-              onPressed: cp.isTyping ? null : _sendMessage,
-            ),
+          IconButton(
+            icon: Icon(Icons.send_rounded,
+                color: (isLocked || chatProvider.isTyping) ? MaaColors.pink : MaaColors.deepPink),
+            onPressed: (isLocked || chatProvider.isTyping) ? null : _sendMessage,
           ),
         ],
       ),

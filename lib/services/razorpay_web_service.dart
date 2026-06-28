@@ -4,6 +4,7 @@
 // ============================================================
 
 import 'package:flutter/foundation.dart';
+import 'razorpay_web_service_stub.dart' if (dart.library.js) 'razorpay_web_service_web.dart' as web_impl;
 
 typedef PaymentSuccessCallback = void Function(String paymentId);
 typedef PaymentFailedCallback = void Function(String error);
@@ -33,41 +34,11 @@ class RazorpayWebService {
       return;
     }
 
-    // Store callbacks for web implementation
-    // Note: Web implementation is loaded dynamically
-    // _onSuccess = onSuccess;
-    // _onFailed = onFailed;
-    // _onDismiss = onDismiss;
+    if (onSuccess != null && onFailed != null && onDismiss != null) {
+      web_impl.setRazorpayCallbacks(onSuccess, onFailed, onDismiss);
+    }
 
-    // Web implementation is loaded dynamically
-    _openCheckoutWeb(
-      keyId: keyId,
-      amount: amount,
-      currency: currency,
-      name: name,
-      description: description,
-      email: email,
-      phone: phone,
-      orderId: orderId,
-    );
-  }
-
-  void _openCheckoutWeb({
-    required String keyId,
-    required int amount,
-    required String currency,
-    required String name,
-    required String description,
-    String? email,
-    String? phone,
-    String? orderId,
-  }) {
-    // This is a stub - actual web implementation uses dart:js
-    // which is conditionally imported via razorpay_web_service_web.dart
-    debugPrint('RazorpayWebService: Web checkout stub called');
-    
-    // Call the web-specific implementation if available
-    _callWebImplementation(
+    web_impl.openRazorpayWebImpl(
       keyId: keyId,
       amount: amount,
       currency: currency,
@@ -77,19 +48,5 @@ class RazorpayWebService {
       phone: phone ?? '',
       orderId: orderId ?? '',
     );
-  }
-
-  void _callWebImplementation({
-    required String keyId,
-    required int amount,
-    required String currency,
-    required String name,
-    required String description,
-    required String email,
-    required String phone,
-    required String orderId,
-  }) {
-    // Stub for non-web platforms
-    // Web platforms override this via conditional imports
   }
 }

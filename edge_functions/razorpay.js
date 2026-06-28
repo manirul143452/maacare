@@ -1,14 +1,20 @@
-// Razorpay Order Creation & Payment Verification Edge Function
-// Secret Key is stored securely in environment variables - NEVER in client code
-
-const RAZORPAY_KEY_SECRET = Deno.env.get('RAZORPAY_KEY_SECRET') || 'Vp4yflICMf3T2PLzQyc5Ieh4';
-const RAZORPAY_KEY_ID = Deno.env.get('RAZORPAY_KEY_ID') || 'rzp_live_SZ3jBvF1B5bVgt';
+// ⚠️  LEGACY edge function (InsForge format) — main logic is now in Railway backend/server.js
+// These keys MUST come from environment — no hardcoded fallbacks allowed
+const RAZORPAY_KEY_SECRET = Deno.env.get('RAZORPAY_KEY_SECRET');
+const RAZORPAY_KEY_ID = Deno.env.get('RAZORPAY_KEY_ID');
+if (!RAZORPAY_KEY_SECRET || !RAZORPAY_KEY_ID) {
+  throw new Error('RAZORPAY_KEY_SECRET and RAZORPAY_KEY_ID must be set in environment variables');
+}
 
 module.exports = async function(request) {
+  // ✅ Allowlisted origins only — no wildcard
+  const ALLOWED_ORIGINS = ['https://maacare.in', 'https://maacare.app', 'https://rainbow-granita-b4981d.netlify.app'];
+  const origin = request.headers.get('Origin') || '';
   const corsHeaders = {
-    'Access-Control-Allow-Origin': '*',
+    'Access-Control-Allow-Origin': ALLOWED_ORIGINS.includes(origin) ? origin : ALLOWED_ORIGINS[0],
     'Access-Control-Allow-Headers': 'Content-Type, Authorization',
     'Content-Type': 'application/json',
+    'Vary': 'Origin',
   };
 
   if (request.method === 'OPTIONS') {

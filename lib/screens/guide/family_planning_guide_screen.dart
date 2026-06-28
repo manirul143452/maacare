@@ -6,13 +6,16 @@
 import 'package:flutter/material.dart';
 import 'package:flutter_animate/flutter_animate.dart';
 import 'package:google_fonts/google_fonts.dart';
+import 'package:flutter_gen/gen_l10n/app_localizations.dart';
 import '../../app_theme.dart';
+import 'data/guide_localizations.dart';
 
 class FamilyPlanningGuideScreen extends StatefulWidget {
   const FamilyPlanningGuideScreen({super.key});
 
   @override
-  State<FamilyPlanningGuideScreen> createState() => _FamilyPlanningGuideScreenState();
+  State<FamilyPlanningGuideScreen> createState() =>
+      _FamilyPlanningGuideScreenState();
 }
 
 class _FamilyPlanningGuideScreenState extends State<FamilyPlanningGuideScreen>
@@ -20,48 +23,50 @@ class _FamilyPlanningGuideScreenState extends State<FamilyPlanningGuideScreen>
   late TabController _tabController;
   final ScrollController _scrollController = ScrollController();
 
-  final List<PlanningSection> _sections = [
-    PlanningSection(
-      title: 'Overview',
-      icon: Icons.family_restroom_rounded,
-      color: MaaColors.pink,
-      imageEmoji: '👨‍👩‍👧‍👦',
-      content: _OverviewContent(),
-    ),
-    PlanningSection(
-      title: 'Why Important',
-      icon: Icons.favorite_rounded,
-      color: MaaColors.softPurple,
-      imageEmoji: '❤️',
-      content: _WhyImportantContent(),
-    ),
-    PlanningSection(
-      title: 'Fertility Awareness',
-      icon: Icons.calendar_today_rounded,
-      color: MaaColors.success,
-      imageEmoji: '📊',
-      content: _FertilityAwarenessContent(),
-    ),
-    PlanningSection(
-      title: 'Modern Methods',
-      icon: Icons.medical_services_rounded,
-      color: MaaColors.lightBlue,
-      imageEmoji: '💊',
-      content: _ModernMethodsContent(),
-    ),
-    PlanningSection(
-      title: 'Infertility Support',
-      icon: Icons.support_rounded,
-      color: MaaColors.peach,
-      imageEmoji: '🤝',
-      content: _InfertilitySupportContent(),
-    ),
-  ];
+  List<PlanningSection> _getSections(Map<String, dynamic> data) {
+    return [
+      PlanningSection(
+        title: data['tabs'][0],
+        icon: Icons.family_restroom_rounded,
+        color: MaaColors.pink,
+        imageEmoji: '👨‍👩‍👧‍👦',
+        content: _OverviewContent(data: data),
+      ),
+      PlanningSection(
+        title: data['tabs'][1],
+        icon: Icons.favorite_rounded,
+        color: MaaColors.softPurple,
+        imageEmoji: '❤️',
+        content: _WhyImportantContent(data: data['important']),
+      ),
+      PlanningSection(
+        title: data['tabs'][2],
+        icon: Icons.calendar_today_rounded,
+        color: MaaColors.success,
+        imageEmoji: '📊',
+        content: _FertilityAwarenessContent(data: data['fertility']),
+      ),
+      PlanningSection(
+        title: data['tabs'][3],
+        icon: Icons.medical_services_rounded,
+        color: MaaColors.lightBlue,
+        imageEmoji: '💊',
+        content: _ModernMethodsContent(data: data['modern']),
+      ),
+      PlanningSection(
+        title: data['tabs'][4],
+        icon: Icons.support_rounded,
+        color: MaaColors.peach,
+        imageEmoji: '🤝',
+        content: _InfertilitySupportContent(data: data['support']),
+      ),
+    ];
+  }
 
   @override
   void initState() {
     super.initState();
-    _tabController = TabController(length: _sections.length, vsync: this);
+    _tabController = TabController(length: 5, vsync: this);
   }
 
   @override
@@ -73,6 +78,9 @@ class _FamilyPlanningGuideScreenState extends State<FamilyPlanningGuideScreen>
 
   @override
   Widget build(BuildContext context) {
+    final data = GuideLocalizations.getFamilyPlanningData(context);
+    final sections = _getSections(data);
+
     return Scaffold(
       backgroundColor: Theme.of(context).scaffoldBackgroundColor,
       body: NestedScrollView(
@@ -86,7 +94,7 @@ class _FamilyPlanningGuideScreenState extends State<FamilyPlanningGuideScreen>
               elevation: 0,
               backgroundColor: MaaColors.cardDark,
               title: Text(
-                'Family Planning',
+                AppLocalizations.of(context).familyPlanning,
                 style: GoogleFonts.poppins(
                   fontWeight: FontWeight.w700,
                   fontSize: 20,
@@ -199,7 +207,7 @@ class _FamilyPlanningGuideScreenState extends State<FamilyPlanningGuideScreen>
                   fontWeight: FontWeight.w500,
                   fontSize: 12,
                 ),
-                tabs: _sections
+                tabs: sections
                     .map((s) => Tab(
                           icon: Icon(s.icon, size: 20),
                           text: s.title,
@@ -211,7 +219,7 @@ class _FamilyPlanningGuideScreenState extends State<FamilyPlanningGuideScreen>
         },
         body: TabBarView(
           controller: _tabController,
-          children: _sections.map((s) => s.content).toList(),
+          children: sections.map((s) => s.content).toList(),
         ),
       ),
     );
@@ -243,6 +251,9 @@ class PlanningSection {
 // ============================================================
 
 class _OverviewContent extends StatelessWidget {
+  final Map<String, dynamic> data;
+  const _OverviewContent({required this.data});
+
   @override
   Widget build(BuildContext context) {
     return SingleChildScrollView(
@@ -251,13 +262,13 @@ class _OverviewContent extends StatelessWidget {
         crossAxisAlignment: CrossAxisAlignment.start,
         children: [
           _buildHeader(
-            'WHO-Guided Family Planning',
+            data['overview']['header'],
             Icons.family_restroom_rounded,
             MaaColors.pink,
             imageEmoji: '👨‍👩‍👧‍👦',
           ),
           const SizedBox(height: 24),
-          
+
           // WHO Badge
           Container(
             padding: const EdgeInsets.all(20),
@@ -286,7 +297,7 @@ class _OverviewContent extends StatelessWidget {
                     const SizedBox(width: 12),
                     Expanded(
                       child: Text(
-                        'Guided by the World Health Organization',
+                        data['overview']['whoBadgeTitle'],
                         style: GoogleFonts.poppins(
                           fontSize: 16,
                           fontWeight: FontWeight.w700,
@@ -298,7 +309,7 @@ class _OverviewContent extends StatelessWidget {
                 ),
                 const SizedBox(height: 12),
                 Text(
-                  'All information in this section is based on the evidence-based principles and guidelines of the WHO, ensuring you receive safe, accurate, and trustworthy information about your reproductive health.',
+                  data['overview']['whoBadgeDesc'],
                   style: GoogleFonts.poppins(
                     fontSize: 13,
                     color: MaaColors.textSecondary,
@@ -308,40 +319,35 @@ class _OverviewContent extends StatelessWidget {
               ],
             ),
           ).animate().fadeIn(),
-          
+
           const SizedBox(height: 24),
-          
+
           // Key Features
-          _buildSubHeader('What You\'ll Find Here'),
+          _buildSubHeader(data['overview']['subHeader']),
           const SizedBox(height: 16),
-          
-          _buildFeatureCard(
-            'Health Benefits',
-            'Learn how family planning improves maternal and child health outcomes.',
-            Icons.health_and_safety_rounded,
-            MaaColors.pink,
-          ),
-          _buildFeatureCard(
-            'Fertility Tracking',
-            'Discover natural methods to understand your fertility cycle.',
-            Icons.calendar_month_rounded,
-            MaaColors.success,
-          ),
-          _buildFeatureCard(
-            'Modern Options',
-            'Explore WHO-recommended contraceptive methods.',
-            Icons.medical_services_rounded,
-            MaaColors.lightBlue,
-          ),
-          _buildFeatureCard(
-            'Support Resources',
-            'Get help and guidance for family planning challenges.',
-            Icons.support_agent_rounded,
-            MaaColors.peach,
-          ),
-          
+
+          ...(data['overview']['features'] as List)
+              .asMap()
+              .entries
+              .map((e) => _buildFeatureCard(
+                    e.value['title'],
+                    e.value['desc'],
+                    [
+                      Icons.health_and_safety_rounded,
+                      Icons.calendar_month_rounded,
+                      Icons.medical_services_rounded,
+                      Icons.support_agent_rounded
+                    ][e.key % 4],
+                    [
+                      MaaColors.pink,
+                      MaaColors.success,
+                      MaaColors.lightBlue,
+                      MaaColors.peach
+                    ][e.key % 4],
+                  )),
+
           const SizedBox(height: 24),
-          
+
           // Human Rights Card
           Container(
             padding: const EdgeInsets.all(20),
@@ -360,7 +366,7 @@ class _OverviewContent extends StatelessWidget {
                 const Text('✨', style: TextStyle(fontSize: 32)),
                 const SizedBox(height: 12),
                 Text(
-                  'A Fundamental Human Right',
+                  data['overview']['rightsTitle'],
                   style: GoogleFonts.poppins(
                     fontSize: 16,
                     fontWeight: FontWeight.w700,
@@ -370,7 +376,7 @@ class _OverviewContent extends StatelessWidget {
                 ),
                 const SizedBox(height: 8),
                 Text(
-                  'Family planning is a fundamental human right. It empowers individuals to make informed decisions about their health and future.',
+                  data['overview']['rightsDesc'],
                   style: GoogleFonts.poppins(
                     fontSize: 13,
                     color: MaaColors.textSecondary,
@@ -388,6 +394,9 @@ class _OverviewContent extends StatelessWidget {
 }
 
 class _WhyImportantContent extends StatelessWidget {
+  final Map<String, dynamic> data;
+  const _WhyImportantContent({required this.data});
+
   @override
   Widget build(BuildContext context) {
     return SingleChildScrollView(
@@ -396,15 +405,15 @@ class _WhyImportantContent extends StatelessWidget {
         crossAxisAlignment: CrossAxisAlignment.start,
         children: [
           _buildHeader(
-            'Why Family Planning is Important',
+            data['header'],
             Icons.favorite_rounded,
             MaaColors.softPurple,
             imageEmoji: '❤️',
           ),
           const SizedBox(height: 24),
-          
+
           Text(
-            'Understand the health and societal benefits of planning your family.',
+            data['intro'],
             style: GoogleFonts.poppins(
               fontSize: 15,
               color: MaaColors.textSecondary,
@@ -412,41 +421,32 @@ class _WhyImportantContent extends StatelessWidget {
             ),
           ),
           const SizedBox(height: 24),
-          
+
           // Benefits Cards
-          _buildBenefitCard(
-            'Reduces Health Risks',
-            'Reduces health risks for mothers and leads to healthier babies. Proper spacing between pregnancies allows the mother\'s body to recover.',
-            Icons.pregnant_woman_rounded,
-            MaaColors.pink,
-          ),
-          _buildBenefitCard(
-            'Better Investment',
-            'Allows parents to invest more in each child\'s nutrition and education, leading to better outcomes for the entire family.',
-            Icons.school_rounded,
-            MaaColors.softPurple,
-          ),
-          _buildBenefitCard(
-            'Financial Stability',
-            'Reduces financial strain on the family by allowing parents to plan and prepare for each child\'s needs.',
-            Icons.account_balance_wallet_rounded,
-            MaaColors.success,
-          ),
-          _buildBenefitCard(
-            'Gender Equality',
-            'Contributes to gender equality by giving women control over their reproductive health and allowing them to pursue education and careers.',
-            Icons.people_rounded,
-            MaaColors.lightBlue,
-          ),
-          _buildBenefitCard(
-            'Community Well-being',
-            'Leads to healthier, more prosperous communities by ensuring every child is wanted and can be properly cared for.',
-            Icons.location_city_rounded,
-            MaaColors.peach,
-          ),
-          
+          ...(data['benefits'] as List)
+              .asMap()
+              .entries
+              .map((e) => _buildBenefitCard(
+                    e.value['title'],
+                    e.value['desc'],
+                    [
+                      Icons.pregnant_woman_rounded,
+                      Icons.school_rounded,
+                      Icons.account_balance_wallet_rounded,
+                      Icons.people_rounded,
+                      Icons.location_city_rounded
+                    ][e.key % 5],
+                    [
+                      MaaColors.pink,
+                      MaaColors.softPurple,
+                      MaaColors.success,
+                      MaaColors.lightBlue,
+                      MaaColors.peach
+                    ][e.key % 5],
+                  )),
+
           const SizedBox(height: 24),
-          
+
           // Stats Card
           Container(
             padding: const EdgeInsets.all(20),
@@ -463,7 +463,7 @@ class _WhyImportantContent extends StatelessWidget {
             child: Column(
               children: [
                 Text(
-                  '📊 Impact Statistics',
+                  data['statsTitle'],
                   style: GoogleFonts.poppins(
                     fontSize: 18,
                     fontWeight: FontWeight.w700,
@@ -471,9 +471,8 @@ class _WhyImportantContent extends StatelessWidget {
                   ),
                 ),
                 const SizedBox(height: 16),
-                _buildStatRow('44%', 'Reduction in maternal deaths'),
-                _buildStatRow('33%', 'Reduction in infant mortality'),
-                _buildStatRow('50%', 'More likely to send children to school'),
+                ...(data['stats'] as List)
+                    .map((s) => _buildStatRow(s['val'], s['desc'])),
               ],
             ),
           ).animate().fadeIn(),
@@ -484,6 +483,9 @@ class _WhyImportantContent extends StatelessWidget {
 }
 
 class _FertilityAwarenessContent extends StatelessWidget {
+  final Map<String, dynamic> data;
+  const _FertilityAwarenessContent({required this.data});
+
   @override
   Widget build(BuildContext context) {
     return SingleChildScrollView(
@@ -492,15 +494,15 @@ class _FertilityAwarenessContent extends StatelessWidget {
         crossAxisAlignment: CrossAxisAlignment.start,
         children: [
           _buildHeader(
-            'Fertility Awareness-Based Methods',
+            data['header'],
             Icons.calendar_today_rounded,
             MaaColors.success,
             imageEmoji: '📊',
           ),
           const SizedBox(height: 24),
-          
+
           Text(
-            'Track your body\'s natural signs to identify fertile days. These methods help you understand your cycle for planning or preventing pregnancy.',
+            data['intro'],
             style: GoogleFonts.poppins(
               fontSize: 14,
               color: MaaColors.textSecondary,
@@ -508,38 +510,33 @@ class _FertilityAwarenessContent extends StatelessWidget {
             ),
           ),
           const SizedBox(height: 24),
-          
+
           // Methods
-          _buildSubHeader('Tracking Methods'),
+          _buildSubHeader(data['subHeader']),
           const SizedBox(height: 16),
-          
-          _buildMethodDetailCard(
-            'Calendar Method',
-            'Track your menstrual cycle on a calendar to predict fertile days. Requires consistent tracking over several months.',
-            Icons.calendar_month_rounded,
-            MaaColors.pink,
-          ),
-          _buildMethodDetailCard(
-            'Basal Body Temperature (BBT)',
-            'Measure your temperature every morning before getting out of bed. A slight rise indicates ovulation has occurred.',
-            Icons.thermostat_rounded,
-            MaaColors.softPurple,
-          ),
-          _buildMethodDetailCard(
-            'Cervical Mucus Monitoring',
-            'Observe changes in cervical mucus throughout your cycle. Fertile mucus is clear, slippery, and stretchy like egg whites.',
-            Icons.water_drop_rounded,
-            MaaColors.lightBlue,
-          ),
-          _buildMethodDetailCard(
-            'Symptothermal Method',
-            'Combines BBT, cervical mucus, and other fertility signs for more accurate tracking.',
-            Icons.analytics_rounded,
-            MaaColors.success,
-          ),
-          
+
+          ...(data['methods'] as List)
+              .asMap()
+              .entries
+              .map((e) => _buildMethodDetailCard(
+                    e.value['title'],
+                    e.value['desc'],
+                    [
+                      Icons.calendar_month_rounded,
+                      Icons.thermostat_rounded,
+                      Icons.water_drop_rounded,
+                      Icons.analytics_rounded
+                    ][e.key % 4],
+                    [
+                      MaaColors.pink,
+                      MaaColors.softPurple,
+                      MaaColors.lightBlue,
+                      MaaColors.success
+                    ][e.key % 4],
+                  )),
+
           const SizedBox(height: 24),
-          
+
           // Pros & Cons
           Container(
             padding: const EdgeInsets.all(20),
@@ -557,7 +554,7 @@ class _FertilityAwarenessContent extends StatelessWidget {
               crossAxisAlignment: CrossAxisAlignment.start,
               children: [
                 Text(
-                  '✅ Advantages',
+                  "✅ ${data['prosTitle']}",
                   style: GoogleFonts.poppins(
                     fontSize: 16,
                     fontWeight: FontWeight.w700,
@@ -565,13 +562,11 @@ class _FertilityAwarenessContent extends StatelessWidget {
                   ),
                 ),
                 const SizedBox(height: 12),
-                _buildBulletPoint('Free and has no side effects'),
-                _buildBulletPoint('No hormones or devices needed'),
-                _buildBulletPoint('Can be used to achieve or avoid pregnancy'),
-                _buildBulletPoint('Helps you understand your body better'),
+                ...(data['pros'] as List)
+                    .map((a) => _buildBulletPoint(a.toString())),
                 const SizedBox(height: 16),
                 Text(
-                  '⚠️ Considerations',
+                  "⚠️ ${data['consTitle']}",
                   style: GoogleFonts.poppins(
                     fontSize: 16,
                     fontWeight: FontWeight.w700,
@@ -579,16 +574,14 @@ class _FertilityAwarenessContent extends StatelessWidget {
                   ),
                 ),
                 const SizedBox(height: 12),
-                _buildBulletPoint('Generally less reliable than modern contraceptives'),
-                _buildBulletPoint('Requires daily tracking and commitment'),
-                _buildBulletPoint('Effectiveness varies with cycle regularity'),
-                _buildBulletPoint('Not suitable for those with irregular periods'),
+                ...(data['cons'] as List)
+                    .map((c) => _buildBulletPoint(c.toString())),
               ],
             ),
           ).animate().fadeIn(),
-          
+
           const SizedBox(height: 24),
-          
+
           // Guidance Card
           Container(
             padding: const EdgeInsets.all(16),
@@ -604,7 +597,7 @@ class _FertilityAwarenessContent extends StatelessWidget {
                 const SizedBox(width: 12),
                 Expanded(
                   child: Text(
-                    'Effectiveness depends heavily on correct and consistent use. Consult a health provider to learn these methods properly.',
+                    data['tipDesc'],
                     style: GoogleFonts.poppins(
                       fontSize: 13,
                       color: MaaColors.textPrimary,
@@ -622,6 +615,9 @@ class _FertilityAwarenessContent extends StatelessWidget {
 }
 
 class _ModernMethodsContent extends StatelessWidget {
+  final Map<String, dynamic> data;
+  const _ModernMethodsContent({required this.data});
+
   @override
   Widget build(BuildContext context) {
     return SingleChildScrollView(
@@ -630,15 +626,15 @@ class _ModernMethodsContent extends StatelessWidget {
         crossAxisAlignment: CrossAxisAlignment.start,
         children: [
           _buildHeader(
-            'Modern Contraceptive Methods',
+            data['header'],
             Icons.medical_services_rounded,
             MaaColors.lightBlue,
             imageEmoji: '💊',
           ),
           const SizedBox(height: 24),
-          
+
           Text(
-            'Explore a wide range of safe and effective options recommended by the WHO. Modern contraceptives offer high effectiveness and variety to fit your lifestyle.',
+            data['intro'],
             style: GoogleFonts.poppins(
               fontSize: 14,
               color: MaaColors.textSecondary,
@@ -646,15 +642,7 @@ class _ModernMethodsContent extends StatelessWidget {
             ),
           ),
           const SizedBox(height: 24),
-          
-          // Categories
-          _buildSubHeader('Method Categories'),
-          const SizedBox(height: 16),
-          
-          _buildCategoryGrid(),
-          
-          const SizedBox(height: 24),
-          
+
           // Link to Contraception Guide
           GestureDetector(
             onTap: () => Navigator.pushNamed(context, '/contraception'),
@@ -690,7 +678,7 @@ class _ModernMethodsContent extends StatelessWidget {
                       crossAxisAlignment: CrossAxisAlignment.start,
                       children: [
                         Text(
-                          'Explore Full Contraception Guide',
+                          data['exploreTitle'],
                           style: GoogleFonts.poppins(
                             fontSize: 16,
                             fontWeight: FontWeight.w700,
@@ -699,7 +687,7 @@ class _ModernMethodsContent extends StatelessWidget {
                         ),
                         const SizedBox(height: 4),
                         Text(
-                          'Detailed info on 16+ contraceptive methods including effectiveness, pros, and cons.',
+                          data['exploreDesc'],
                           style: GoogleFonts.poppins(
                             fontSize: 12,
                             color: MaaColors.textSecondary,
@@ -712,9 +700,9 @@ class _ModernMethodsContent extends StatelessWidget {
               ),
             ),
           ).animate().fadeIn(),
-          
+
           const SizedBox(height: 24),
-          
+
           // Quick Reference Table
           Container(
             padding: const EdgeInsets.all(20),
@@ -727,7 +715,7 @@ class _ModernMethodsContent extends StatelessWidget {
               crossAxisAlignment: CrossAxisAlignment.start,
               children: [
                 Text(
-                  '📋 Quick Effectiveness Reference',
+                  "📋 ${data['quickTitle']}",
                   style: GoogleFonts.poppins(
                     fontSize: 16,
                     fontWeight: FontWeight.w700,
@@ -735,10 +723,16 @@ class _ModernMethodsContent extends StatelessWidget {
                   ),
                 ),
                 const SizedBox(height: 16),
-                _buildEffectivenessRow('Implant, IUD, Sterilization', '99%', MaaColors.success),
-                _buildEffectivenessRow('Pill, Patch, Ring', '93%', MaaColors.warning),
-                _buildEffectivenessRow('Condoms', '87%', MaaColors.warning),
-                _buildEffectivenessRow('Fertility Awareness', '76-88%', MaaColors.peach),
+                ...(data['quickStats'] as List).asMap().entries.map((e) =>
+                    _buildEffectivenessRow(
+                        e.value['name'],
+                        e.value['val'],
+                        [
+                          MaaColors.success,
+                          MaaColors.warning,
+                          MaaColors.warning,
+                          MaaColors.peach
+                        ][e.key % 4])),
               ],
             ),
           ).animate().fadeIn(),
@@ -749,6 +743,9 @@ class _ModernMethodsContent extends StatelessWidget {
 }
 
 class _InfertilitySupportContent extends StatelessWidget {
+  final Map<String, dynamic> data;
+  const _InfertilitySupportContent({required this.data});
+
   @override
   Widget build(BuildContext context) {
     return SingleChildScrollView(
@@ -757,13 +754,13 @@ class _InfertilitySupportContent extends StatelessWidget {
         crossAxisAlignment: CrossAxisAlignment.start,
         children: [
           _buildHeader(
-            'Infertility Support',
+            data['header'],
             Icons.support_rounded,
             MaaColors.peach,
             imageEmoji: '🤝',
           ),
           const SizedBox(height: 24),
-          
+
           // Support Message
           Container(
             padding: const EdgeInsets.all(20),
@@ -782,7 +779,7 @@ class _InfertilitySupportContent extends StatelessWidget {
                 const Text('💕', style: TextStyle(fontSize: 40)),
                 const SizedBox(height: 12),
                 Text(
-                  'You Are Not Alone',
+                  data['notAloneTitle'],
                   style: GoogleFonts.poppins(
                     fontSize: 20,
                     fontWeight: FontWeight.w700,
@@ -792,7 +789,7 @@ class _InfertilitySupportContent extends StatelessWidget {
                 ),
                 const SizedBox(height: 12),
                 Text(
-                  'Infertility is a common issue affecting millions of couples worldwide. It is a medical condition, not a personal failure. Help and support are available.',
+                  data['notAloneDesc'],
                   style: GoogleFonts.poppins(
                     fontSize: 14,
                     color: MaaColors.textSecondary,
@@ -803,134 +800,76 @@ class _InfertilitySupportContent extends StatelessWidget {
               ],
             ),
           ).animate().fadeIn(),
-          
+
           const SizedBox(height: 24),
-          
-          // When to Seek Help
-          _buildSubHeader('When to Consult a Healthcare Provider'),
+
+          // Sub 1
+          _buildSubHeader(data['sub1']),
           const SizedBox(height: 16),
-          
-          _buildTimelineCard(
-            'Under 35',
-            'Try for 1 year without success before seeking help',
-            '12',
-            MaaColors.success,
-          ),
-          _buildTimelineCard(
-            '35 or Older',
-            'Try for 6 months without success before seeking help',
-            '6',
-            MaaColors.warning,
-          ),
-          _buildTimelineCard(
-            'Irregular Periods',
-            'Seek help earlier if you have irregular or painful periods',
-            '!',
-            MaaColors.pink,
-          ),
-          
+
+          ...(data['sub1Items'] as List)
+              .asMap()
+              .entries
+              .map((e) => _buildTimelineCard(
+                    e.value['title'],
+                    e.value['desc'],
+                    ['1', '2', '3'][e.key % 3],
+                    [
+                      MaaColors.success,
+                      MaaColors.warning,
+                      MaaColors.pink
+                    ][e.key % 3],
+                  )),
+
           const SizedBox(height: 24),
-          
-          // Common Causes
-          _buildSubHeader('Common Causes'),
+
+          // Sub 2
+          _buildSubHeader(data['sub2']),
           const SizedBox(height: 16),
-          
-          _buildCauseCard(
-            'Female Factors',
-            [
-              'Ovulation disorders (PCOS)',
-              'Blocked fallopian tubes',
-              'Endometriosis',
-              'Age-related factors',
-              'Uterine abnormalities',
-            ],
-            Icons.female_rounded,
-            MaaColors.pink,
-          ),
-          _buildCauseCard(
-            'Male Factors',
-            [
-              'Low sperm count',
-              'Poor sperm motility',
-              'Abnormal sperm shape',
-              'Varicocele',
-              'Hormonal imbalances',
-            ],
-            Icons.male_rounded,
-            MaaColors.lightBlue,
-          ),
-          
+
+          ...(data['sub2Items'] as List)
+              .asMap()
+              .entries
+              .map((e) => _buildMethodDetailCard(
+                    e.value['title'],
+                    e.value['desc'],
+                    [
+                      Icons.medical_services_rounded,
+                      Icons.healing_rounded,
+                      Icons.science_rounded,
+                      Icons.favorite_rounded
+                    ][e.key % 4],
+                    [
+                      MaaColors.pink,
+                      MaaColors.lightBlue,
+                      MaaColors.softPurple,
+                      MaaColors.success
+                    ][e.key % 4],
+                  )),
+
           const SizedBox(height: 24),
-          
-          // Treatment Options
-          Container(
-            padding: const EdgeInsets.all(20),
-            decoration: BoxDecoration(
-              gradient: LinearGradient(
-                colors: [
-                  MaaColors.peach.withAlpha(30),
-                  MaaColors.gold.withAlpha(20),
-                ],
-              ),
-              borderRadius: BorderRadius.circular(20),
-              border: Border.all(color: MaaColors.peach.withAlpha(40)),
-            ),
-            child: Column(
-              crossAxisAlignment: CrossAxisAlignment.start,
-              children: [
-                Text(
-                  '🏥 Treatment Options',
-                  style: GoogleFonts.poppins(
-                    fontSize: 18,
-                    fontWeight: FontWeight.w700,
-                    color: MaaColors.peach,
-                  ),
-                ),
-                const SizedBox(height: 16),
-                _buildTreatmentItem('Lifestyle Changes', 'Weight, diet, exercise, stress reduction'),
-                _buildTreatmentItem('Medications', 'Ovulation induction, hormone therapy'),
-                _buildTreatmentItem('Surgical Procedures', 'Laparoscopy, hysteroscopy, varicocele repair'),
-                _buildTreatmentItem('Assisted Reproductive Technology', 'IUI, IVF, ICSI'),
-                _buildTreatmentItem('Alternative Options', 'Adoption, surrogacy, donor programs'),
-              ],
-            ),
-          ).animate().fadeIn(),
-          
-          const SizedBox(height: 24),
-          
-          // Emotional Support
-          Container(
-            padding: const EdgeInsets.all(16),
-            decoration: BoxDecoration(
-              color: MaaColors.glassBackground,
-              borderRadius: BorderRadius.circular(16),
-              border: Border.all(color: MaaColors.glassBorder),
-            ),
-            child: Column(
-              children: [
-                const Text('🫂', style: TextStyle(fontSize: 32)),
-                const SizedBox(height: 12),
-                Text(
-                  'Emotional Support is Important',
-                  style: GoogleFonts.poppins(
-                    fontSize: 16,
-                    fontWeight: FontWeight.w700,
-                    color: MaaColors.textPrimary,
-                  ),
-                ),
-                const SizedBox(height: 8),
-                Text(
-                  'Consider joining support groups, talking to a counselor, or connecting with others going through similar experiences. Your mental health matters.',
-                  style: GoogleFonts.poppins(
-                    fontSize: 13,
-                    color: MaaColors.textSecondary,
-                    height: 1.6,
-                  ),
-                  textAlign: TextAlign.center,
-                ),
-              ],
-            ),
-          ),
+
+          // Sub 3
+          _buildSubHeader(data['sub3']),
+          const SizedBox(height: 16),
+
+          ...(data['sub3Items'] as List)
+              .asMap()
+              .entries
+              .map((e) => _buildMethodDetailCard(
+                    e.value['title'],
+                    e.value['desc'],
+                    [
+                      Icons.psychology_rounded,
+                      Icons.people_rounded,
+                      Icons.self_improvement_rounded
+                    ][e.key % 3],
+                    [
+                      MaaColors.peach,
+                      MaaColors.success,
+                      MaaColors.pink
+                    ][e.key % 3],
+                  )),
         ],
       ),
     ).animate().fadeIn();
@@ -941,7 +880,8 @@ class _InfertilitySupportContent extends StatelessWidget {
 //  Helper Widgets
 // ============================================================
 
-Widget _buildHeader(String title, IconData icon, Color color, {String? imageEmoji}) {
+Widget _buildHeader(String title, IconData icon, Color color,
+    {String? imageEmoji}) {
   return Column(
     crossAxisAlignment: CrossAxisAlignment.center,
     children: [
@@ -1046,7 +986,8 @@ Widget _buildBulletPoint(String text) {
   );
 }
 
-Widget _buildFeatureCard(String title, String description, IconData icon, Color color) {
+Widget _buildFeatureCard(
+    String title, String description, IconData icon, Color color) {
   return Container(
     margin: const EdgeInsets.only(bottom: 12),
     padding: const EdgeInsets.all(16),
@@ -1097,7 +1038,8 @@ Widget _buildFeatureCard(String title, String description, IconData icon, Color 
   ).animate().fadeIn();
 }
 
-Widget _buildBenefitCard(String title, String description, IconData icon, Color color) {
+Widget _buildBenefitCard(
+    String title, String description, IconData icon, Color color) {
   return Container(
     margin: const EdgeInsets.only(bottom: 16),
     padding: const EdgeInsets.all(20),
@@ -1186,7 +1128,8 @@ Widget _buildStatRow(String percentage, String description) {
   );
 }
 
-Widget _buildMethodDetailCard(String title, String description, IconData icon, Color color) {
+Widget _buildMethodDetailCard(
+    String title, String description, IconData icon, Color color) {
   return Container(
     margin: const EdgeInsets.only(bottom: 12),
     padding: const EdgeInsets.all(16),
@@ -1238,63 +1181,10 @@ Widget _buildMethodDetailCard(String title, String description, IconData icon, C
   ).animate().fadeIn();
 }
 
-Widget _buildCategoryGrid() {
-  final categories = [
-    {'name': 'Hormonal', 'emoji': '💊', 'color': MaaColors.pink},
-    {'name': 'Barrier', 'emoji': '🛡️', 'color': MaaColors.lightBlue},
-    {'name': 'IUD', 'emoji': '⭕', 'color': MaaColors.softPurple},
-    {'name': 'Permanent', 'emoji': '🔒', 'color': MaaColors.warning},
-    {'name': 'Emergency', 'emoji': '🚨', 'color': MaaColors.peach},
-    {'name': 'Natural', 'emoji': '🌿', 'color': MaaColors.success},
-  ];
 
-  return GridView.builder(
-    shrinkWrap: true,
-    physics: const NeverScrollableScrollPhysics(),
-    gridDelegate: const SliverGridDelegateWithFixedCrossAxisCount(
-      crossAxisCount: 2,
-      childAspectRatio: 1.3,
-      crossAxisSpacing: 12,
-      mainAxisSpacing: 12,
-    ),
-    itemCount: categories.length,
-    itemBuilder: (context, index) {
-      final cat = categories[index];
-      return Container(
-        decoration: BoxDecoration(
-          gradient: LinearGradient(
-            colors: [
-              (cat['color'] as Color).withAlpha(40),
-              (cat['color'] as Color).withAlpha(20),
-            ],
-          ),
-          borderRadius: BorderRadius.circular(20),
-          border: Border.all(color: (cat['color'] as Color).withAlpha(40)),
-        ),
-        child: Column(
-          mainAxisAlignment: MainAxisAlignment.center,
-          children: [
-            Text(
-              cat['emoji'] as String,
-              style: const TextStyle(fontSize: 32),
-            ),
-            const SizedBox(height: 8),
-            Text(
-              cat['name'] as String,
-              style: GoogleFonts.poppins(
-                fontSize: 14,
-                fontWeight: FontWeight.w600,
-                color: MaaColors.textPrimary,
-              ),
-            ),
-          ],
-        ),
-      ).animate().fadeIn(delay: (50 * index).ms);
-    },
-  );
-}
 
-Widget _buildEffectivenessRow(String method, String effectiveness, Color color) {
+Widget _buildEffectivenessRow(
+    String method, String effectiveness, Color color) {
   return Padding(
     padding: const EdgeInsets.only(bottom: 10),
     child: Row(
@@ -1329,7 +1219,8 @@ Widget _buildEffectivenessRow(String method, String effectiveness, Color color) 
   );
 }
 
-Widget _buildTimelineCard(String age, String description, String time, Color color) {
+Widget _buildTimelineCard(
+    String age, String description, String time, Color color) {
   return Container(
     margin: const EdgeInsets.only(bottom: 12),
     padding: const EdgeInsets.all(16),
@@ -1390,105 +1281,6 @@ Widget _buildTimelineCard(String age, String description, String time, Color col
   ).animate().fadeIn();
 }
 
-Widget _buildCauseCard(String title, List<String> items, IconData icon, Color color) {
-  return Container(
-    margin: const EdgeInsets.only(bottom: 16),
-    padding: const EdgeInsets.all(20),
-    decoration: BoxDecoration(
-      gradient: LinearGradient(
-        colors: [color.withAlpha(25), color.withAlpha(10)],
-      ),
-      borderRadius: BorderRadius.circular(20),
-      border: Border.all(color: color.withAlpha(40)),
-    ),
-    child: Column(
-      crossAxisAlignment: CrossAxisAlignment.start,
-      children: [
-        Row(
-          children: [
-            Container(
-              padding: const EdgeInsets.all(10),
-              decoration: BoxDecoration(
-                gradient: LinearGradient(
-                  colors: [color.withAlpha(150), color.withAlpha(80)],
-                ),
-                borderRadius: BorderRadius.circular(12),
-              ),
-              child: Icon(icon, color: Colors.white, size: 24),
-            ),
-            const SizedBox(width: 12),
-            Text(
-              title,
-              style: GoogleFonts.poppins(
-                fontSize: 16,
-                fontWeight: FontWeight.w700,
-                color: color,
-              ),
-            ),
-          ],
-        ),
-        const SizedBox(height: 16),
-        ...items.map((item) => Padding(
-          padding: const EdgeInsets.only(bottom: 8),
-          child: Row(
-            crossAxisAlignment: CrossAxisAlignment.start,
-            children: [
-              Text('• ', style: TextStyle(color: color, fontSize: 16)),
-              Expanded(
-                child: Text(
-                  item,
-                  style: GoogleFonts.poppins(
-                    fontSize: 13,
-                    color: MaaColors.textPrimary,
-                  ),
-                ),
-              ),
-            ],
-          ),
-        )),
-      ],
-    ),
-  ).animate().fadeIn();
-}
 
-Widget _buildTreatmentItem(String title, String description) {
-  return Padding(
-    padding: const EdgeInsets.only(bottom: 12),
-    child: Row(
-      crossAxisAlignment: CrossAxisAlignment.start,
-      children: [
-        Container(
-          padding: const EdgeInsets.all(6),
-          decoration: BoxDecoration(
-            color: MaaColors.peach.withAlpha(30),
-            borderRadius: BorderRadius.circular(8),
-          ),
-          child: const Icon(Icons.check_rounded, color: MaaColors.peach, size: 16),
-        ),
-        const SizedBox(width: 12),
-        Expanded(
-          child: Column(
-            crossAxisAlignment: CrossAxisAlignment.start,
-            children: [
-              Text(
-                title,
-                style: GoogleFonts.poppins(
-                  fontSize: 14,
-                  fontWeight: FontWeight.w600,
-                  color: MaaColors.textPrimary,
-                ),
-              ),
-              Text(
-                description,
-                style: GoogleFonts.poppins(
-                  fontSize: 12,
-                  color: MaaColors.textSecondary,
-                ),
-              ),
-            ],
-          ),
-        ),
-      ],
-    ),
-  );
-}
+
+

@@ -223,12 +223,12 @@ class _GyneCareConsultationScreenState extends State<GyneCareConsultationScreen>
     required DateTime date,
     required String time,
   }) async {
+    final user = context.read<UserProvider>().user;
     setState(() => _isBooking = true);
     final success = await MaaCareBackendService.instance.bookAppointment(booking);
     
     if (success && doctor.userId != null) {
       try {
-        final user = context.read<UserProvider>().user;
         final doctorUser = await MaaCareBackendService.instance.fetchUser(doctor.userId!);
         if (doctorUser != null &&
             doctorUser.onesignalPlayerId != null &&

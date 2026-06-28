@@ -1,4 +1,5 @@
 {
     "claudeCode.useTerminal": true,
-    "java.configuration.updateBuildConfiguration": "interactive"
+    "java.configuration.updateBuildConfiguration": "automatic",
+    "cmake.sourceDirectory": "C:/Users/user/Desktop/maacare/linux/flutter"
 }

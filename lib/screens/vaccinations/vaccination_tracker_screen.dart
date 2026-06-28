@@ -8,7 +8,8 @@ import 'package:provider/provider.dart';
 import '../../app_theme.dart';
 import '../../models/symptom_vaccination_model.dart';
 import '../../providers/user_provider.dart';
-import '../../services/insforge_service.dart';
+import '../../services/maacare_backend_service.dart';
+import 'package:flutter_gen/gen_l10n/app_localizations.dart';
 
 class VaccinationTrackerScreen extends StatefulWidget {
   const VaccinationTrackerScreen({super.key});
@@ -37,7 +38,7 @@ class _VaccinationTrackerScreenState extends State<VaccinationTrackerScreen> {
 
     try {
       var list =
-          await InsForgeService.instance.fetchVaccinations(user.id);
+          await MaaCareBackendService.instance.fetchVaccinations(user.id);
 
       if (list.isEmpty && user.dueDate != null) {
         // Generate schedule and save
@@ -45,7 +46,7 @@ class _VaccinationTrackerScreenState extends State<VaccinationTrackerScreen> {
           userId: user.id,
           dueDate: user.dueDate!,
         );
-        await InsForgeService.instance.upsertVaccinations(list);
+        await MaaCareBackendService.instance.upsertVaccinations(list);
       }
 
       setState(() {
@@ -64,7 +65,7 @@ class _VaccinationTrackerScreenState extends State<VaccinationTrackerScreen> {
     setState(() => _vaccinations![index].completed = !vax.completed);
 
     try {
-      await InsForgeService.instance
+      await MaaCareBackendService.instance
           .markVaccinationComplete(vax.id);
     } catch (_) {
       setState(() => _vaccinations![index].completed = vax.completed);
@@ -77,7 +78,7 @@ class _VaccinationTrackerScreenState extends State<VaccinationTrackerScreen> {
     final done = _vaccinations?.where((v) => v.completed).length ?? 0;
 
     return Scaffold(
-      appBar: AppBar(title: const Text('Vaccination Tracker 💉')),
+      appBar: AppBar(title: Text(AppLocalizations.of(context).vaccinationTracker)),
       body: PopScope(
         canPop: true,
         onPopInvokedWithResult: (didPop, result) {
@@ -94,7 +95,7 @@ class _VaccinationTrackerScreenState extends State<VaccinationTrackerScreen> {
                 // Progress header
                 Container(
                   padding: const EdgeInsets.all(20),
-                  color: MaaColors.white,
+                  color: MaaColors.cardDark,
                   child: Column(
                     children: [
                       Row(
@@ -222,8 +223,8 @@ class _VaccinationTrackerScreenState extends State<VaccinationTrackerScreen> {
                                             ),
                                             if (isOverdue) ...[
                                               const SizedBox(width: 8),
-                                              const Text('OVERDUE',
-                                                  style: TextStyle(
+                                              Text(AppLocalizations.of(context).overdue,
+                                                  style: const TextStyle(
                                                       fontSize: 10,
                                                       color: MaaColors.error,
                                                       fontWeight:

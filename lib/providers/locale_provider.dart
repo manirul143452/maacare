@@ -1,32 +1,43 @@
 // ============================================================
-//  LocaleProvider – MaaCare
-//  Manages app language; persists choice to SharedPreferences
+//  LocaleProvider – MaaCare (12 Indian Languages + English)
 // ============================================================
 
 import 'package:flutter/material.dart';
 import 'package:shared_preferences/shared_preferences.dart';
+import 'package:flutter_gen/gen_l10n/app_localizations.dart';
 
 class LocaleProvider extends ChangeNotifier {
   Locale _locale = const Locale('en');
 
   Locale get locale => _locale;
 
-  // Language display names → locale code
-  static const Map<String, String> languageMap = {
-    'English': 'en',
-    'हिन्दी': 'hi',
-    'অসমীয়া': 'as',
-    'বাংলা': 'bn',
-  };
+  static const List<MaaLanguage> supportedLanguages = [
+    MaaLanguage('en', 'English',    'English',    '🇬🇧'),
+    MaaLanguage('hi', 'हिन्दी',     'Hindi',      '🇮🇳'),
+    MaaLanguage('bn', 'বাংলা',      'Bengali',    '🇮🇳'),
+    MaaLanguage('as', 'অসমীয়া',    'Assamese',   '🇮🇳'),
+    MaaLanguage('ta', 'தமிழ்',      'Tamil',      '🇮🇳'),
+    MaaLanguage('te', 'తెలుగు',     'Telugu',     '🇮🇳'),
+    MaaLanguage('mr', 'मराठी',      'Marathi',    '🇮🇳'),
+    MaaLanguage('gu', 'ગુજરાતી',    'Gujarati',   '🇮🇳'),
+    MaaLanguage('kn', 'ಕನ್ನಡ',      'Kannada',    '🇮🇳'),
+    MaaLanguage('ml', 'മലയാളം',     'Malayalam',  '🇮🇳'),
+    MaaLanguage('pa', 'ਪੰਜਾਬੀ',     'Punjabi',    '🇮🇳'),
+    MaaLanguage('or', 'ଓଡ଼ିଆ',      'Odia',       '🇮🇳'),
+  ];
 
-  static const Map<String, String> codeToName = {
-    'en': 'English',
-    'hi': 'हिन्दी',
-    'as': 'অসমীয়া',
-    'bn': 'বাংলা',
-  };
+  static List<String> get supportedCodes =>
+      AppLocalizations.supportedLocales.map((l) => l.languageCode).toList();
 
-  String get currentLanguageName => codeToName[_locale.languageCode] ?? 'English';
+  String get currentLanguageName =>
+      supportedLanguages
+          .firstWhere((l) => l.code == _locale.languageCode,
+              orElse: () => supportedLanguages.first)
+          .nativeName;
+
+  MaaLanguage get currentLanguage =>
+      supportedLanguages.firstWhere((l) => l.code == _locale.languageCode,
+          orElse: () => supportedLanguages.first);
 
   LocaleProvider() {
     _loadLocale();
@@ -34,13 +45,19 @@ class LocaleProvider extends ChangeNotifier {
 
   Future<void> _loadLocale() async {
     final prefs = await SharedPreferences.getInstance();
-    final code = prefs.getString('locale_code') ?? 'en';
+    final code = prefs.getString('locale_code') ?? _systemLocaleCode();
     _locale = Locale(code);
     notifyListeners();
   }
 
+  /// Auto-detect system locale, fallback to English
+  String _systemLocaleCode() {
+    final sys = WidgetsBinding.instance.platformDispatcher.locale.languageCode;
+    return supportedCodes.contains(sys) ? sys : 'en';
+  }
+
   Future<void> setLocale(Locale locale) async {
-    if (_locale == locale) return;
+    if (_locale.languageCode == locale.languageCode) return;
     _locale = locale;
     notifyListeners();
     final prefs = await SharedPreferences.getInstance();
@@ -50,4 +67,14 @@ class LocaleProvider extends ChangeNotifier {
   Future<void> setLocaleByCode(String code) async {
     await setLocale(Locale(code));
   }
+}
+
+/// Immutable language descriptor
+class MaaLanguage {
+  final String code;
+  final String nativeName;
+  final String englishName;
+  final String flag;
+
+  const MaaLanguage(this.code, this.nativeName, this.englishName, this.flag);
 }

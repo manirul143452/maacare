@@ -1350,9 +1350,9 @@ class _HomeScreenState extends State<HomeScreen> with TickerProviderStateMixin {
   Widget _buildLatestInParentsPark() {
     return Consumer<CommunityProvider>(
       builder: (context, provider, _) {
-        // Auto-fetch posts when widget builds (if not already loading)
+        // Auto-fetch posts when widget builds (if not already loading or fetched)
         if (!provider.isLoading &&
-            provider.posts.isEmpty &&
+            !provider.hasFetched &&
             provider.error == null) {
           WidgetsBinding.instance.addPostFrameCallback((_) {
             provider.fetchPosts(limit: 5);

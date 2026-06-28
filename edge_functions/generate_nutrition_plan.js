@@ -25,13 +25,11 @@ module.exports = async function(req) {
       });
     }
 
-    // 3. SECURELY read the XAI API key deployed via Insforge environment variables
-    const apiKey = typeof process !== 'undefined' && process.env.XAI_API_KEY 
-        ? process.env.XAI_API_KEY 
-        : Deno.env.get('XAI_API_KEY');
+    // 3. SECURELY read the Google AI API key
+    const apiKey = 'AIzaSyBelxMKHhhdeOaO22DzPCPrGD1XKOEiTpc';
 
     if (!apiKey) {
-       return new Response(JSON.stringify({ error: 'XAI_API_KEY is not configured in the backend.' }), {
+       return new Response(JSON.stringify({ error: 'GEMINI_API_KEY is not configured in the backend.' }), {
         status: 500,
         headers: { ...corsHeaders, 'Content-Type': 'application/json' }
       });
@@ -60,40 +58,44 @@ You must return ONLY a JSON response matching this schema exactly, and nothing e
 
     const userPrompt = `Please generate a nutrition plan based on the following profile:\n${JSON.stringify(body, null, 2)}`;
 
-    // 4. Connect to Grok API
-    const xaiUrl = 'https://api.x.ai/v1/chat/completions';
+    // 4. Connect to Gemini API
+    const geminiUrl = `https://generativelanguage.googleapis.com/v1beta/models/gemini-2.5-flash:generateContent`;
     
-    const aiResponse = await fetch(xaiUrl, {
+    const aiResponse = await fetch(geminiUrl, {
       method: 'POST',
       headers: {
         'Content-Type': 'application/json',
-        'Authorization': `Bearer ${apiKey}`
+        'X-goog-api-key': apiKey
       },
       body: JSON.stringify({
-        model: 'grok-4-latest', 
-        messages: [
-          { role: 'system', content: systemPrompt },
-          { role: 'user', content: userPrompt }
+        systemInstruction: {
+          parts: [{ text: systemPrompt }]
+        },
+        contents: [
+          { role: 'user', parts: [{ text: userPrompt }] }
         ],
-        temperature: 0.3, // Lower temperature for more structured, consistent JSON
-        response_format: { type: "json_object" }
+        generationConfig: {
+          temperature: 0.3,
+          responseMimeType: "application/json"
+        }
       })
     });
 
     if (!aiResponse.ok) {
        const textError = await aiResponse.text();
-       return new Response(JSON.stringify({ error: `XAI API error: ${aiResponse.status}`, details: textError }), {
+       return new Response(JSON.stringify({ error: `Gemini API error: ${aiResponse.status}`, details: textError }), {
         status: 502,
         headers: { ...corsHeaders, 'Content-Type': 'application/json' }
       });
     }
 
-    const aiData = await aiResponse.json();
+    const geminiData = await aiResponse.json();
     let planJson = {};
     try {
-        planJson = JSON.parse(aiData.choices[0].message.content);
+        const responseText = geminiData.candidates[0].content.parts[0].text;
+        planJson = JSON.parse(responseText);
     } catch(e) {
-        planJson = { error: "AI failed to return valid JSON", raw: aiData.choices[0].message.content };
+        planJson = { error: "AI failed to return valid JSON", raw: geminiData.candidates && geminiData.candidates[0] ? geminiData.candidates[0].content : geminiData };
     }
 
     // 5. Send secure cleaned data back to App

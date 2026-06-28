@@ -1,6 +1,7 @@
 // ignore_for_file: deprecated_member_use
 import 'package:flutter/material.dart';
 import '../../app_theme.dart';
+import 'package:flutter_gen/gen_l10n/app_localizations.dart';
 
 class NutritionPlanResultScreen extends StatelessWidget {
   final Map<String, dynamic> planData;
@@ -18,7 +19,7 @@ class NutritionPlanResultScreen extends StatelessWidget {
     return Scaffold(
       backgroundColor: MaaColors.background,
       appBar: AppBar(
-        title: const Text('Your Personalized Plan'),
+        title: Text(AppLocalizations.of(context).personalAiNutritionPlan),
       ),
       body: SingleChildScrollView(
         padding: const EdgeInsets.all(20),
@@ -36,7 +37,7 @@ class NutritionPlanResultScreen extends StatelessWidget {
               child: Column(
                 crossAxisAlignment: CrossAxisAlignment.start,
                 children: [
-                  const Text('Plan Summary', style: TextStyle(color: MaaColors.white, fontSize: 14)),
+                   Text(AppLocalizations.of(context).planSummary, style: const TextStyle(color: MaaColors.white, fontSize: 14)),
                   const SizedBox(height: 8),
                   Text(
                     summary.toString(),
@@ -49,20 +50,20 @@ class NutritionPlanResultScreen extends StatelessWidget {
 
             // Macros
             if (needs.isNotEmpty) ...[
-              const Text('Daily Calculated Needs', style: TextStyle(fontSize: 18, fontWeight: FontWeight.bold)),
+               Text(AppLocalizations.of(context).dailyCalculatedNeeds, style: const TextStyle(fontSize: 18, fontWeight: FontWeight.bold)),
               const SizedBox(height: 12),
               Row(
                 children: [
-                  _buildMacroTile('Calories', '\${needs["calories"]}', '🔥'),
+                  _buildMacroTile('Calories', '${needs["calories"] ?? "N/A"}', '🔥'),
                   const SizedBox(width: 12),
-                  _buildMacroTile('Protein', '\${needs["protein"]}', '🥩'),
+                  _buildMacroTile('Protein', '${needs["protein"] ?? "N/A"}', '🥩'),
                 ],
               ),
               const SizedBox(height: 24),
             ],
 
             // Daily Plan
-            const Text('Daily Schedule', style: TextStyle(fontSize: 18, fontWeight: FontWeight.bold)),
+             Text(AppLocalizations.of(context).dailySchedule, style: const TextStyle(fontSize: 18, fontWeight: FontWeight.bold)),
             const SizedBox(height: 12),
             _buildMealCard('Morning Wake Up', dailyPlan['morning_wake_up'], '🌅'),
             _buildMealCard('Breakfast', dailyPlan['breakfast'], '🍳'),
@@ -76,7 +77,7 @@ class NutritionPlanResultScreen extends StatelessWidget {
 
             // Shopping List
             if (shoppingList.isNotEmpty) ...[
-              const Text('Shopping List', style: TextStyle(fontSize: 18, fontWeight: FontWeight.bold)),
+               Text(AppLocalizations.of(context).shoppingList, style: const TextStyle(fontSize: 18, fontWeight: FontWeight.bold)),
               const SizedBox(height: 12),
               Container(
                 padding: const EdgeInsets.all(16),
@@ -107,7 +108,7 @@ class NutritionPlanResultScreen extends StatelessWidget {
                 decoration: BoxDecoration(
                   color: MaaColors.cardDark,
                   borderRadius: BorderRadius.circular(16),
-                  border: Border.all(color: MaaColors.pink.withOpacity(0.3)),
+                  border: Border.all(color: MaaColors.pink.withValues(alpha: 0.3)),
                 ),
                 child: Row(
                   children: [
@@ -124,7 +125,7 @@ class NutritionPlanResultScreen extends StatelessWidget {
               width: double.infinity,
               child: ElevatedButton(
                 onPressed: () => Navigator.pop(context),
-                child: const Text('Back to Home'),
+                child: Text(AppLocalizations.of(context).backToHome),
               ),
             )
           ],
@@ -162,7 +163,7 @@ class NutritionPlanResultScreen extends StatelessWidget {
         decoration: BoxDecoration(
           color: MaaColors.cardDark,
           borderRadius: BorderRadius.circular(16),
-          boxShadow: [BoxShadow(color: Colors.black.withOpacity(0.05), blurRadius: 8)],
+          boxShadow: [BoxShadow(color: Colors.black.withValues(alpha: 0.05), blurRadius: 8)],
         ),
         child: Row(
           crossAxisAlignment: CrossAxisAlignment.start,

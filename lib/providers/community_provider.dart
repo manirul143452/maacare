@@ -5,7 +5,7 @@
 import 'package:flutter/foundation.dart';
 import '../models/post_model.dart';
 import '../models/user_model.dart';
-import '../services/insforge_service.dart';
+import '../services/maacare_backend_service.dart';
 import '../services/realtime_client.dart';
 
 class CommunityProvider extends ChangeNotifier {
@@ -15,25 +15,28 @@ class CommunityProvider extends ChangeNotifier {
   String? _error;
   int? _weekFilter;
   bool _isSubscribed = false;
+  bool _hasFetched = false;
 
   List<PostModel> get posts => _posts;
   List<UserModel> get suggestedMamas => _suggestedMamas;
   bool get isLoading => _isLoading;
   String? get error => _error;
   int? get weekFilter => _weekFilter;
+  bool get hasFetched => _hasFetched;
 
   Future<void> fetchPosts({int? weekTag, int? limit}) async {
     _weekFilter = weekTag;
     _setLoading(true);
     try {
       final results = await Future.wait([
-        InsForgeService.instance.fetchPosts(weekTag: weekTag, limit: limit ?? 50),
-        InsForgeService.instance.fetchUsers(limit: 50),
+        MaaCareBackendService.instance.fetchPosts(weekTag: weekTag, limit: limit ?? 50),
+        MaaCareBackendService.instance.fetchUsers(limit: 50),
       ]);
       
       _posts = results[0] as List<PostModel>;
       _suggestedMamas = results[1] as List<UserModel>;
       _error = null;
+      _hasFetched = true;
 
       _initializeRealtime();
       
@@ -80,7 +83,7 @@ class CommunityProvider extends ChangeNotifier {
   }
 
   Future<String?> uploadMedia(String fileName, List<int> bytes, {String bucket = 'community_media'}) async {
-    return await InsForgeService.instance.uploadFile(
+    return await MaaCareBackendService.instance.uploadFile(
       bucket: bucket,
       fileName: fileName,
       bytes: bytes,
@@ -89,7 +92,7 @@ class CommunityProvider extends ChangeNotifier {
 
   Future<bool> createPost(PostModel post) async {
     try {
-      final created = await InsForgeService.instance.createPost(post);
+      final created = await MaaCareBackendService.instance.createPost(post);
       if (created != null) {
         _posts.insert(0, created);
         notifyListeners();
@@ -114,7 +117,7 @@ class CommunityProvider extends ChangeNotifier {
     notifyListeners();
 
     try {
-      await InsForgeService.instance.likePost(postId, post.likes);
+      await MaaCareBackendService.instance.likePost(postId, post.likes);
     } catch (_) {
       // Revert on failure
       _posts[index]

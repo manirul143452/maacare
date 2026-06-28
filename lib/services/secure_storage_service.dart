@@ -9,7 +9,18 @@ class SecureStorageService {
   SecureStorageService._();
   static final SecureStorageService instance = SecureStorageService._();
 
-  final _storage = const FlutterSecureStorage();
+  // ✅ AES encryption enabled for secure token storage on Android.
+  // resetOnError: true handles Keystore invalidation after factory reset / app reinstall
+  // gracefully (re-login required) instead of crashing. Backup is handled via
+  // android:fullBackupContent rules excluding FlutterSecureStorage from cloud backup.
+  static const _androidOptions = AndroidOptions(
+    encryptedSharedPreferences: true,
+    resetOnError: true,
+  );
+
+  final _storage = const FlutterSecureStorage(
+    aOptions: _androidOptions,
+  );
 
   Future<void> write(String key, String value) async {
     await _storage.write(key: key, value: value);

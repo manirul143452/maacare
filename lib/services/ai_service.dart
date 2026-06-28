@@ -6,6 +6,7 @@
 import 'dart:convert';
 import 'package:http/http.dart' as http;
 import '../constants.dart';
+import 'api_service.dart';
 
 class AIService {
   AIService._();
@@ -29,13 +30,13 @@ class AIService {
   // ─────────────────── InsForge AI ───────────────────
 
   Future<String?> _callInsForgeAI(List<Map<String, String>> messages) async {
-    final url = Uri.parse('${AppConstants.insForgeUrl}/api/ai/chat/completion');
+    final url = Uri.parse('${AppConstants.backendUrl}/api/ai/chat/completion');
 
     final response = await http.post(
       url,
       headers: {
         'Content-Type': 'application/json',
-        'Authorization': 'Bearer ${AppConstants.insForgeAnonKey}',
+        'Authorization': 'Bearer ${AppConstants.backendAnonKey}',
       },
       body: jsonEncode({
         'model': _insForgeModel,
@@ -46,7 +47,7 @@ class AIService {
     ).timeout(const Duration(seconds: 15));
 
     if (response.statusCode == 200) {
-      final data = jsonDecode(response.body);
+      final data = ApiService.safeDecode(response);
       if (data['success'] == true && data['content'] != null) {
         return data['content'] as String;
       }

@@ -5,7 +5,6 @@
 
 // ignore_for_file: avoid_print
 import 'dart:convert';
-import 'dart:typed_data';
 import 'package:flutter/material.dart';
 import 'package:provider/provider.dart';
 import 'package:uuid/uuid.dart';
@@ -14,16 +13,20 @@ import 'package:flutter_animate/flutter_animate.dart';
 import 'package:confetti/confetti.dart';
 import 'package:google_fonts/google_fonts.dart';
 import 'package:video_player/video_player.dart';
+import 'dart:io';
+import 'package:flutter/foundation.dart';
 import '../../app_theme.dart';
 import '../../models/post_model.dart';
 import '../../providers/community_provider.dart';
 import '../../providers/user_provider.dart';
 import '../../constants.dart';
-import '../../services/insforge_service.dart';
+import '../../services/maacare_backend_service.dart';
+import '../../services/push_notification_service.dart';
 import '../../widgets/loading_overlay.dart';
 import '../../utils/error_helper.dart';
-import '../../l10n/app_localizations.dart';
-import 'package:url_launcher/url_launcher.dart';
+import 'package:flutter_gen/gen_l10n/app_localizations.dart';
+import 'package:cached_network_image/cached_network_image.dart';
+import '../../theme/menstrual_medical_theme.dart';
 
 class ParentsParkScreen extends StatefulWidget {
   const ParentsParkScreen({super.key});
@@ -101,9 +104,13 @@ class _ParentsParkScreenState extends State<ParentsParkScreen>
       'useless',
     ];
     final lower = content.toLowerCase();
+    final user = context.read<UserProvider>().user;
+    final isUnmarried = user?.userRole == 'unmarried_girl';
     for (final word in negativeWords) {
       if (lower.contains(word)) {
-        return '🌸 Sending love and positivity to all mamas! Every day is a new blessing. You are strong, beautiful, and never alone. 💕';
+        return isUnmarried
+            ? '🌸 Sending love and positivity to all sakhis! Every day is a new blessing. You are strong, beautiful, and never alone. 💕'
+            : '🌸 Sending love and positivity to all mamas! Every day is a new blessing. You are strong, beautiful, and never alone. 💕';
       }
     }
     return content;
@@ -141,6 +148,7 @@ class _ParentsParkScreenState extends State<ParentsParkScreen>
 
   @override
   Widget build(BuildContext context) {
+    final user = context.read<UserProvider>().user;
     return Scaffold(
       backgroundColor: Theme.of(context).scaffoldBackgroundColor,
       appBar: _buildAppBar(),
@@ -149,36 +157,12 @@ class _ParentsParkScreenState extends State<ParentsParkScreen>
           isLoading: provider.isLoading,
           child: Stack(
             children: [
-              // Particle background
-              ...List.generate(15, (index) {
-                final random = index * 37 % 100;
-                final size = 1.5 + (index % 3);
-                return Positioned(
-                  left: (random * 3.6) % MediaQuery.of(context).size.width,
-                  top: (random * 5.2) % MediaQuery.of(context).size.height,
-                  child: Container(
-                    width: size,
-                    height: size,
-                    decoration: BoxDecoration(
-                      shape: BoxShape.circle,
-                      color: index % 3 == 0
-                          ? MaaColors.pink.withAlpha(25)
-                          : index % 3 == 1
-                              ? MaaColors.gold.withAlpha(20)
-                              : MaaColors.softPurple.withAlpha(25),
-                    ),
-                  ),
-                ).animate(onPlay: (c) => c.repeat()).moveY(
-                      begin: 0,
-                      end: -20,
-                      duration: Duration(seconds: 3 + (index % 4)),
-                      curve: Curves.easeInOut,
-                    );
-              }),
+              // Particle background — isolated widget with proper lifecycle
+              const _CommunityParticles(),
               Column(
                 children: [
                   _buildSocialProofHeader(),
-                  _buildSuggestedConnections(),
+                  // ── Suggested Mamas moved to bottom of feed ──
                   Expanded(
                     child: Builder(
                       builder: (ctx) {
@@ -240,7 +224,7 @@ class _ParentsParkScreenState extends State<ParentsParkScreen>
                                           duration: 1.seconds),
                                   const SizedBox(height: 16),
                                   Text(
-                                    'Be the first to share, Mama!',
+                                    user?.userRole == 'unmarried_girl' ? 'Be the first to share, Sakhi!' : 'Be the first to share, Mama!',
                                     style: GoogleFonts.poppins(
                                       fontSize: 18,
                                       fontWeight: FontWeight.w600,
@@ -260,24 +244,40 @@ class _ParentsParkScreenState extends State<ParentsParkScreen>
                             ),
                           );
                         }
+
+                        // Total items = posts + 1 (Suggested Mamas footer)
+                        final totalItems = provider.posts.length + 1;
+
                         return RefreshIndicator(
                           onRefresh: _fetchData,
                           color: MaaColors.pink,
                           backgroundColor: MaaColors.cardDark,
                           child: ListView.separated(
                             controller: _scrollController,
-                            padding: const EdgeInsets.all(16),
-                            itemCount: provider.posts.length,
-                            separatorBuilder: (_, __) =>
-                                const SizedBox(height: 14),
-                            itemBuilder: (_, i) => _PostCard(
-                              post: provider.posts[i],
-                              onLike: () =>
-                                  provider.likePost(provider.posts[i].id),
-                            )
-                                .animate()
-                                .fadeIn(delay: (i * 60).ms)
-                                .moveY(begin: 20, end: 0),
+                            padding: const EdgeInsets.fromLTRB(16, 16, 16, 24),
+                            itemCount: totalItems,
+                            separatorBuilder: (_, i) {
+                              // No separator before the footer
+                              if (i == provider.posts.length - 1) {
+                                return const SizedBox(height: 28);
+                              }
+                              return const SizedBox(height: 14);
+                            },
+                            itemBuilder: (_, i) {
+                              // Last item → Suggested Mamas section
+                              if (i == provider.posts.length) {
+                                return _buildSuggestedConnectionsFooter(
+                                    provider);
+                              }
+                              return _PostCard(
+                                post: provider.posts[i],
+                                onLike: () =>
+                                    provider.likePost(provider.posts[i].id),
+                              )
+                                  .animate()
+                                  .fadeIn(delay: (i * 60).ms)
+                                  .moveY(begin: 20, end: 0);
+                            },
                           ),
                         );
                       },
@@ -294,6 +294,7 @@ class _ParentsParkScreenState extends State<ParentsParkScreen>
   }
 
   PreferredSizeWidget _buildAppBar() {
+    final user = context.read<UserProvider>().user;
     return AppBar(
       backgroundColor: Theme.of(context).scaffoldBackgroundColor,
       elevation: 0,
@@ -312,10 +313,10 @@ class _ParentsParkScreenState extends State<ParentsParkScreen>
       title: Row(
         mainAxisSize: MainAxisSize.min,
         children: [
-          const Text('🌳', style: TextStyle(fontSize: 22)),
+          Text(user?.userRole == 'unmarried_girl' ? '🌸' : '🌳', style: const TextStyle(fontSize: 22)),
           const SizedBox(width: 8),
           Text(
-            AppLocalizations.of(context).navCommunity,
+            user?.userRole == 'unmarried_girl' ? 'Sakhi Circle' : AppLocalizations.of(context).navCommunity,
             style: GoogleFonts.poppins(
               fontSize: 18,
               fontWeight: FontWeight.w600,
@@ -342,6 +343,8 @@ class _ParentsParkScreenState extends State<ParentsParkScreen>
   }
 
   Widget _buildSocialProofHeader() {
+    final user = context.read<UserProvider>().user;
+    final isUnmarried = user?.userRole == 'unmarried_girl';
     return Container(
       margin: const EdgeInsets.symmetric(horizontal: 16, vertical: 8),
       padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 12),
@@ -356,7 +359,9 @@ class _ParentsParkScreenState extends State<ParentsParkScreen>
           const SizedBox(width: 10),
           Expanded(
             child: Text(
-              '${AppConstants.momsOnline} Mamas sharing their journey',
+              isUnmarried
+                  ? '${AppConstants.momsOnline} Sakhis sharing their journey'
+                  : '${AppConstants.momsOnline} Mamas sharing their journey',
               style: GoogleFonts.poppins(
                 fontSize: 12,
                 fontWeight: FontWeight.w500,
@@ -410,186 +415,215 @@ class _ParentsParkScreenState extends State<ParentsParkScreen>
     ).animate().fadeIn();
   }
 
-  Widget _buildSuggestedConnections() {
-    final provider = context.watch<CommunityProvider>();
-    final mamas = provider.suggestedMamas;
 
-    // Rich real-looking user data
-    final suggestions = [
-      {
-        'name': 'Priya Sharma',
-        'week': 'Week 24',
-        'location': 'Mumbai',
-        'posts': '12',
-        'color1': '0xFFE91E8C',
-        'color2': '0xFFAB47BC'
-      },
-      {
-        'name': 'Sara Ahmed',
-        'week': 'Week 18',
-        'location': 'Delhi',
-        'posts': '8',
-        'color1': '0xFF42A5F5',
-        'color2': '0xFF7E57C2'
-      },
-      {
-        'name': 'Anjali R.',
-        'week': 'Week 30',
-        'location': 'Pune',
-        'posts': '21',
-        'color1': '0xFF4CAF50',
-        'color2': '0xFF26C6DA'
-      },
-      {
-        'name': 'Fatima K.',
-        'week': 'Week 12',
-        'location': 'Hyderabad',
-        'posts': '5',
-        'color1': '0xFFFF7043',
-        'color2': '0xFFFFD600'
-      },
-      {
-        'name': 'Meera Iyer',
-        'week': 'Week 36',
-        'location': 'Bangalore',
-        'posts': '34',
-        'color1': '0xFFEC407A',
-        'color2': '0xFFFF7043'
-      },
-      {
-        'name': 'Renu Verma',
-        'week': 'Week 20',
-        'location': 'Kolkata',
-        'posts': '9',
-        'color1': '0xFF26C6DA',
-        'color2': '0xFF42A5F5'
-      },
+
+  // Footer version — rendered as last item inside the feed ListView
+  Widget _buildSuggestedConnectionsFooter(CommunityProvider provider) {
+    final user = context.read<UserProvider>().user;
+    final isUnmarried = user?.userRole == 'unmarried_girl';
+    final mamas = provider.suggestedMamas;
+    if (mamas.isEmpty) return const SizedBox.shrink();
+
+    const colors1 = [
+      Color(0xFFE91E8C),
+      Color(0xFF42A5F5),
+      Color(0xFF4CAF50),
+      Color(0xFFFF7043),
+      Color(0xFFEC407A),
+    ];
+    const colors2 = [
+      Color(0xFFAB47BC),
+      Color(0xFF7E57C2),
+      Color(0xFF26C6DA),
+      Color(0xFFFFD600),
+      Color(0xFFFF7043),
     ];
 
-    final totalCount = mamas.isNotEmpty ? mamas.length : suggestions.length;
-    return Container(
-      height: 258,
-      margin: const EdgeInsets.only(bottom: 12, top: 8),
-      decoration: BoxDecoration(
-        color: MaaColors.cardDark.withAlpha(40),
-        border: Border(
-          bottom: BorderSide(color: MaaColors.glassBorder, width: 1),
-          top: BorderSide(color: MaaColors.glassBorder, width: 1),
+    return Column(
+      crossAxisAlignment: CrossAxisAlignment.start,
+      children: [
+        // ── Divider with label ──────────────────────────────────────────────
+        Padding(
+          padding: const EdgeInsets.symmetric(vertical: 12),
+          child: Row(
+            children: [
+              Expanded(
+                child: Container(height: 1, color: MaaColors.glassBorder),
+              ),
+              Container(
+                margin: const EdgeInsets.symmetric(horizontal: 12),
+                padding:
+                    const EdgeInsets.symmetric(horizontal: 10, vertical: 4),
+                decoration: BoxDecoration(
+                  color: (isUnmarried ? MenstrualMedicalTheme.electricOrchid : MaaColors.pink).withAlpha(15),
+                  borderRadius: BorderRadius.circular(20),
+                  border: Border.all(color: (isUnmarried ? MenstrualMedicalTheme.electricOrchid : MaaColors.pink).withAlpha(40)),
+                ),
+                child: Text(
+                  isUnmarried ? "🌸 You've reached the end" : "🌸 You've reached the end",
+                  style: GoogleFonts.poppins(
+                    fontSize: 10,
+                    fontWeight: FontWeight.w600,
+                    color: isUnmarried ? MenstrualMedicalTheme.electricOrchid : MaaColors.pink,
+                  ),
+                ),
+              ),
+              Expanded(
+                child: Container(height: 1, color: MaaColors.glassBorder),
+              ),
+            ],
+          ),
         ),
-      ),
-      child: Column(
-        crossAxisAlignment: CrossAxisAlignment.start,
-        children: [
-          Padding(
-            padding: const EdgeInsets.fromLTRB(20, 14, 20, 10),
-            child: Row(
-              mainAxisAlignment: MainAxisAlignment.spaceBetween,
-              children: [
-                Row(
+
+        // ── Section header ──────────────────────────────────────────────────
+        Container(
+          padding: const EdgeInsets.all(16),
+          decoration: BoxDecoration(
+            gradient: LinearGradient(
+              colors: isUnmarried
+                  ? [
+                      MenstrualMedicalTheme.electricOrchid.withAlpha(18),
+                      MenstrualMedicalTheme.darkSlate.withAlpha(18),
+                    ]
+                  : [
+                      MaaColors.pink.withAlpha(18),
+                      MaaColors.softPurple.withAlpha(18),
+                    ],
+            ),
+            borderRadius: const BorderRadius.vertical(top: Radius.circular(20)),
+            border: Border.all(color: MaaColors.glassBorder),
+          ),
+          child: Row(
+            mainAxisAlignment: MainAxisAlignment.spaceBetween,
+            children: [
+              Row(
+                children: [
+                  Container(
+                    padding: const EdgeInsets.all(7),
+                    decoration: BoxDecoration(
+                      gradient: LinearGradient(
+                        colors: isUnmarried
+                            ? [MenstrualMedicalTheme.electricOrchid, MenstrualMedicalTheme.darkSlate]
+                            : [MaaColors.pink, MaaColors.softPurple],
+                      ),
+                      borderRadius: BorderRadius.circular(10),
+                    ),
+                    child: const Icon(Icons.group_add_rounded,
+                        color: MaaColors.white, size: 16),
+                  ),
+                  const SizedBox(width: 10),
+                  Column(
+                    crossAxisAlignment: CrossAxisAlignment.start,
+                    children: [
+                      Text(
+                        isUnmarried ? 'Suggested Sakhis' : 'Suggested Mamas',
+                        style: GoogleFonts.poppins(
+                          fontSize: 15,
+                          fontWeight: FontWeight.w700,
+                          color: MaaColors.textPrimary,
+                          letterSpacing: 0.3,
+                        ),
+                      ),
+                      Text(
+                        isUnmarried
+                            ? 'Connect with friends on the same journey'
+                            : 'Connect with mamas on the same journey',
+                        style: GoogleFonts.poppins(
+                          fontSize: 10,
+                          color: MaaColors.textSecondary,
+                        ),
+                      ),
+                    ],
+                  ),
+                ],
+              ),
+              Container(
+                padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 4),
+                decoration: BoxDecoration(
+                  color: MaaColors.success.withAlpha(25),
+                  borderRadius: BorderRadius.circular(10),
+                  border: Border.all(color: MaaColors.success.withAlpha(50)),
+                ),
+                child: Row(
                   children: [
                     Container(
-                      padding: const EdgeInsets.all(6),
+                      width: 6,
+                      height: 6,
                       decoration: BoxDecoration(
-                        gradient: MaaColors.primaryGradient,
-                        borderRadius: BorderRadius.circular(8),
+                        color: MaaColors.success,
+                        shape: BoxShape.circle,
+                        boxShadow: [
+                          BoxShadow(
+                            color: MaaColors.success.withAlpha(150),
+                            blurRadius: 4,
+                            spreadRadius: 1,
+                          ),
+                        ],
                       ),
-                      child: const Icon(Icons.group_add_rounded,
-                          color: MaaColors.white, size: 16),
                     ),
-                    const SizedBox(width: 8),
+                    const SizedBox(width: 5),
                     Text(
-                      'Suggested Mamas',
+                      '${mamas.length} online',
                       style: GoogleFonts.poppins(
-                        fontSize: 15,
-                        fontWeight: FontWeight.w700,
-                        color: MaaColors.textPrimary,
-                        letterSpacing: 0.3,
+                        fontSize: 10,
+                        fontWeight: FontWeight.w600,
+                        color: MaaColors.success,
                       ),
                     ),
                   ],
                 ),
-                Container(
-                  padding:
-                      const EdgeInsets.symmetric(horizontal: 8, vertical: 3),
-                  decoration: BoxDecoration(
-                    color: MaaColors.pink.withAlpha(20),
-                    borderRadius: BorderRadius.circular(10),
-                  ),
-                  child: Text(
-                    '$totalCount online',
-                    style: GoogleFonts.poppins(
-                      fontSize: 10,
-                      fontWeight: FontWeight.w600,
-                      color: MaaColors.pink,
-                    ),
-                  ),
-                ),
-              ],
+              ),
+            ],
+          ),
+        ),
+
+        // ── Horizontal card list ────────────────────────────────────────────
+        Container(
+          height: 230,
+          decoration: BoxDecoration(
+            color: MaaColors.cardDark.withAlpha(60),
+            borderRadius:
+                const BorderRadius.vertical(bottom: Radius.circular(20)),
+            border: Border(
+              left: BorderSide(color: MaaColors.glassBorder),
+              right: BorderSide(color: MaaColors.glassBorder),
+              bottom: BorderSide(color: MaaColors.glassBorder),
             ),
           ),
-          Expanded(
-            child: ListView.builder(
-              scrollDirection: Axis.horizontal,
-              padding: const EdgeInsets.symmetric(horizontal: 16),
-              itemCount: mamas.isNotEmpty ? mamas.length : suggestions.length,
-              itemBuilder: (context, index) {
-                final String cardName;
-                final String cardWeek;
-                final String cardLocation;
-                final String cardPosts;
-                final Color col1;
-                final Color col2;
+          child: ListView.builder(
+            scrollDirection: Axis.horizontal,
+            padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 10),
+            itemCount: mamas.length,
+            itemBuilder: (ctx, index) {
+              final m = mamas[index];
+              final hash = m.id.hashCode.abs();
+              final col1 = colors1[hash % colors1.length];
+              final col2 = colors2[hash % colors2.length];
+              final cardWeek =
+                  m.pregnancyWeek > 0 ? 'Week ${m.pregnancyWeek}' : (isUnmarried ? 'Sakhi' : 'Mama');
 
-                if (mamas.isNotEmpty) {
-                  final m = mamas[index];
-                  cardName = m.name;
-                  cardWeek = 'Week ${m.pregnancyWeek}';
-                  cardLocation = 'India';
-                  cardPosts = '${(index + 1) * 3}';
-                  final colors1 = [
-                    const Color(0xFFE91E8C),
-                    const Color(0xFF42A5F5),
-                    const Color(0xFF4CAF50)
-                  ];
-                  final colors2 = [
-                    const Color(0xFFAB47BC),
-                    const Color(0xFF7E57C2),
-                    const Color(0xFF26C6DA)
-                  ];
-                  col1 = colors1[index % colors1.length];
-                  col2 = colors2[index % colors2.length];
-                } else {
-                  final s = suggestions[index];
-                  cardName = s['name']!;
-                  cardWeek = s['week']!;
-                  cardLocation = s['location']!;
-                  cardPosts = s['posts']!;
-                  col1 = Color(int.parse(s['color1']!));
-                  col2 = Color(int.parse(s['color2']!));
-                }
-
-                final mamaUser = mamas.isNotEmpty ? mamas[index] : null;
-                return GestureDetector(
-                  onTap: () => _showUserProfile(context, cardName, cardWeek,
-                      cardLocation, col1, col2, mamaUser),
-                  child: _SuggestedConnectionCard(
-                    name: cardName,
-                    week: cardWeek,
-                    location: cardLocation,
-                    postCount: cardPosts,
-                    gradientColor1: col1,
-                    gradientColor2: col2,
-                  )
-                      .animate()
-                      .fadeIn(delay: (index * 100).ms)
-                      .slideX(begin: 0.3, end: 0, curve: Curves.easeOutCubic),
-                );
-              },
-            ),
+              return GestureDetector(
+                onTap: () => _showUserProfile(
+                    context, m.name, cardWeek, 'India', col1, col2, m),
+                child: _SuggestedConnectionCard(
+                  name: m.name,
+                  week: cardWeek,
+                  location: 'India',
+                  postCount: m.points.toString(),
+                  gradientColor1: col1,
+                  gradientColor2: col2,
+                  avatarUrl: m.avatarUrl,
+                )
+                    .animate()
+                    .fadeIn(delay: (index * 80).ms)
+                    .slideX(begin: 0.2, end: 0, curve: Curves.easeOutCubic),
+              );
+            },
           ),
-        ],
-      ),
-    ).animate().fadeIn(delay: 300.ms);
+        ),
+        const SizedBox(height: 80), // space for FAB
+      ],
+    ).animate().fadeIn(delay: 200.ms).moveY(begin: 30, end: 0);
   }
 
   Widget _buildFAB() {
@@ -626,6 +660,7 @@ class _ParentsParkScreenState extends State<ParentsParkScreen>
 
   void _showFilterSheet() {
     final user = context.read<UserProvider>().user;
+    final isUnmarried = user?.userRole == 'unmarried_girl';
     showModalBottomSheet(
       context: context,
       backgroundColor: MaaColors.cardDark,
@@ -657,17 +692,18 @@ class _ParentsParkScreenState extends State<ParentsParkScreen>
               ),
             ),
             const SizedBox(height: 16),
-            _buildFilterOption('🌍', 'All Mamas', () {
+            _buildFilterOption('🌍', isUnmarried ? 'All Sakhis' : 'All Mamas', () {
               _fetchData();
               Navigator.pop(context);
             }),
-            _buildFilterOption('👶', 'Week ${user?.pregnancyWeek ?? 0} Mamas',
-                () {
-              context
-                  .read<CommunityProvider>()
-                  .fetchPosts(weekTag: user?.pregnancyWeek);
-              Navigator.pop(context);
-            }),
+            if (!isUnmarried)
+              _buildFilterOption('👶', 'Week ${user?.pregnancyWeek ?? 0} Mamas',
+                  () {
+                context
+                    .read<CommunityProvider>()
+                    .fetchPosts(weekTag: user?.pregnancyWeek);
+                Navigator.pop(context);
+              }),
           ],
         ),
       ),
@@ -849,6 +885,7 @@ class _SuggestedConnectionCard extends StatefulWidget {
   final String postCount;
   final Color gradientColor1;
   final Color gradientColor2;
+  final String? avatarUrl;
 
   const _SuggestedConnectionCard({
     required this.name,
@@ -857,6 +894,7 @@ class _SuggestedConnectionCard extends StatefulWidget {
     required this.postCount,
     required this.gradientColor1,
     required this.gradientColor2,
+    this.avatarUrl,
   });
 
   @override
@@ -891,6 +929,16 @@ class _SuggestedConnectionCardState extends State<_SuggestedConnectionCard>
       if (mounted) {
         setState(() => _isConnected = !_isConnected);
         _animController.reverse();
+
+        if (_isConnected) {
+          final payload = NotificationPayload(
+            type: 'community',
+            title: 'Friend Request',
+            body: '${widget.name} wants to connect with you! 💕',
+            route: '/community',
+          );
+          PushNotificationService.instance.addNotificationFromPayload(payload);
+        }
       }
     });
   }
@@ -955,18 +1003,48 @@ class _SuggestedConnectionCardState extends State<_SuggestedConnectionCard>
                         shape: BoxShape.circle,
                         color: MaaColors.background,
                       ),
-                      child: CircleAvatar(
-                        radius: 26,
-                        backgroundColor: widget.gradientColor1.withAlpha(30),
-                        child: Text(
-                          _initials,
-                          style: TextStyle(
-                            fontSize: 18,
-                            fontWeight: FontWeight.w800,
-                            color: widget.gradientColor1,
-                          ),
-                        ),
-                      ),
+                      child: widget.avatarUrl != null && widget.avatarUrl!.isNotEmpty
+                          ? ClipOval(
+                              child: CachedNetworkImage(
+                                imageUrl: widget.avatarUrl!,
+                                fit: BoxFit.cover,
+                                width: 52,
+                                height: 52,
+                                memCacheWidth: 120,
+                                placeholder: (context, url) => Center(
+                                  child: Text(
+                                    _initials,
+                                    style: TextStyle(
+                                      fontSize: 18,
+                                      fontWeight: FontWeight.w800,
+                                      color: widget.gradientColor1,
+                                    ),
+                                  ),
+                                ),
+                                errorWidget: (context, url, error) => Center(
+                                  child: Text(
+                                    _initials,
+                                    style: TextStyle(
+                                      fontSize: 18,
+                                      fontWeight: FontWeight.w800,
+                                      color: widget.gradientColor1,
+                                    ),
+                                  ),
+                                ),
+                              ),
+                            )
+                          : CircleAvatar(
+                              radius: 26,
+                              backgroundColor: widget.gradientColor1.withAlpha(30),
+                              child: Text(
+                                _initials,
+                                style: TextStyle(
+                                  fontSize: 18,
+                                  fontWeight: FontWeight.w800,
+                                  color: widget.gradientColor1,
+                                ),
+                              ),
+                            ),
                     ),
                   ),
                   // Online green dot
@@ -1135,7 +1213,7 @@ class _PostCardState extends State<_PostCard>
   Future<void> _loadReplies() async {
     setState(() => _loadingReplies = true);
     try {
-      _replies = await InsForgeService.instance.fetchReplies(widget.post.id);
+      _replies = await MaaCareBackendService.instance.fetchReplies(widget.post.id);
     } catch (_) {}
     if (mounted) setState(() => _loadingReplies = false);
   }
@@ -1149,7 +1227,7 @@ class _PostCardState extends State<_PostCard>
 
     setState(() => _postingReply = true);
     try {
-      final reply = await InsForgeService.instance.createReply(
+      final reply = await MaaCareBackendService.instance.createReply(
         postId: widget.post.id,
         userId: user.id,
         content: text,
@@ -1162,7 +1240,11 @@ class _PostCardState extends State<_PostCard>
         if (mounted) {
           ScaffoldMessenger.of(context).showSnackBar(
             SnackBar(
-              content: const Text('Reply sent! 💕 You\'re supporting a mama!'),
+              content: Text(
+                user.userRole == 'unmarried_girl'
+                    ? 'Reply sent! 💕 You\'re supporting a friend!'
+                    : 'Reply sent! 💕 You\'re supporting a mama!',
+              ),
               behavior: SnackBarBehavior.floating,
               backgroundColor: MaaColors.cardLight,
               shape: RoundedRectangleBorder(
@@ -1195,24 +1277,31 @@ class _PostCardState extends State<_PostCard>
         return const SizedBox();
       }
     }
-    return Image.network(
-      url,
+    return CachedNetworkImage(
+      imageUrl: url,
       fit: BoxFit.fitWidth,
       width: double.infinity,
-      loadingBuilder: (ctx, child, progress) => progress == null
-          ? child
-          : Container(
-              height: 150,
-              color: MaaColors.cardLight,
-              child: const Center(
-                  child: CircularProgressIndicator(
-                      color: MaaColors.pink, strokeWidth: 2))),
-      errorBuilder: (_, __, ___) => Container(
-          height: 100,
-          color: MaaColors.cardLight,
-          child: const Center(
-              child: Icon(Icons.broken_image_rounded,
-                  color: MaaColors.textMuted))),
+      memCacheWidth: 600,
+      placeholder: (context, url) => Container(
+        height: 150,
+        color: MaaColors.cardLight,
+        child: const Center(
+          child: CircularProgressIndicator(
+            color: MaaColors.pink,
+            strokeWidth: 2,
+          ),
+        ),
+      ),
+      errorWidget: (context, url, error) => Container(
+        height: 100,
+        color: MaaColors.cardLight,
+        child: const Center(
+          child: Icon(
+            Icons.broken_image_rounded,
+            color: MaaColors.textMuted,
+          ),
+        ),
+      ),
     );
   }
 
@@ -1285,6 +1374,7 @@ class _PostCardState extends State<_PostCard>
 
   @override
   Widget build(BuildContext context) {
+    final user = context.watch<UserProvider>().user;
     final post = widget.post;
     return MouseRegion(
       onEnter: (_) => setState(() => _isHovered = true),
@@ -1690,9 +1780,9 @@ class _PostCardState extends State<_PostCard>
                                 children: [
                                   Text(
                                     (r['anonymous'] == true)
-                                        ? 'Mama 🌸'
+                                        ? (user?.userRole == 'unmarried_girl' ? 'Sakhi 🌸' : 'Mama 🌸')
                                         : (r['author_name'] as String? ??
-                                            'Mama'),
+                                            (user?.userRole == 'unmarried_girl' ? 'Sakhi' : 'Mama')),
                                     style: GoogleFonts.poppins(
                                       fontSize: 11,
                                       fontWeight: FontWeight.w600,
@@ -2210,14 +2300,34 @@ class _VideoPostPlayerState extends State<VideoPostPlayer> {
     _isDataUri =
         widget.url.startsWith('data:') || widget.url.startsWith('blob:');
 
-    if (_isDataUri) {
-      // data: URIs — show a styled play card; video_player cannot handle these on web
-      // User can tap to open in new tab
-      setState(() => _error = false);
+    if (_isDataUri && !kIsWeb) {
+      _initLocalDataUri();
       return;
     }
 
-    _controller = VideoPlayerController.networkUrl(Uri.parse(widget.url))
+    // On Web, blob: and data: URIs can be played directly by the video element via networkUrl.
+    _initNetworkUrl(widget.url);
+  }
+
+  Future<void> _initLocalDataUri() async {
+    try {
+      final base64Str = widget.url.split(',').last;
+      final bytes = base64Decode(base64Str);
+      final filename = 'temp_vid_${DateTime.now().millisecondsSinceEpoch}.mp4';
+      final file = File('${Directory.systemTemp.path}/$filename');
+      await file.writeAsBytes(bytes);
+
+      _controller = VideoPlayerController.file(file);
+      await _controller.initialize();
+      if (mounted) setState(() => _initialized = true);
+    } catch (e) {
+      debugPrint('Video Base64 decode error: $e');
+      if (mounted) setState(() => _error = true);
+    }
+  }
+
+  void _initNetworkUrl(String url) {
+    _controller = VideoPlayerController.networkUrl(Uri.parse(url))
       ..initialize().then((_) {
         if (mounted) setState(() => _initialized = true);
       }).catchError((e) {
@@ -2228,67 +2338,12 @@ class _VideoPostPlayerState extends State<VideoPostPlayer> {
 
   @override
   void dispose() {
-    if (!_isDataUri) _controller.dispose();
+    _controller.dispose();
     super.dispose();
   }
 
   @override
   Widget build(BuildContext context) {
-    // For data:/blob: URIs — show a tappable video card
-    if (_isDataUri) {
-      return GestureDetector(
-        onTap: () async {
-          // Open blob/data URI in new browser tab on web
-          debugPrint('Video URL: ${widget.url.substring(0, 30)}...');
-          try {
-            await launchUrl(Uri.parse(widget.url), mode: LaunchMode.externalApplication);
-          } catch (_) {
-            debugPrint('Could not launch video URL');
-          }
-        },
-        child: Container(
-          height: 200,
-          width: double.infinity,
-          decoration: BoxDecoration(
-            borderRadius: BorderRadius.circular(16),
-            gradient: LinearGradient(
-              colors: [
-                MaaColors.softPurple.withAlpha(40),
-                MaaColors.cardLight,
-              ],
-              begin: Alignment.topLeft,
-              end: Alignment.bottomRight,
-            ),
-            border: Border.all(color: MaaColors.softPurple.withAlpha(60)),
-          ),
-          child: Column(
-            mainAxisAlignment: MainAxisAlignment.center,
-            children: [
-              Container(
-                padding: const EdgeInsets.all(18),
-                decoration: BoxDecoration(
-                  color: MaaColors.softPurple.withAlpha(30),
-                  shape: BoxShape.circle,
-                ),
-                child: const Icon(Icons.play_circle_fill_rounded,
-                    color: MaaColors.softPurple, size: 52),
-              ),
-              const SizedBox(height: 12),
-              Text('Video Post 🎬',
-                  style: GoogleFonts.poppins(
-                      fontSize: 14,
-                      fontWeight: FontWeight.w600,
-                      color: MaaColors.softPurple)),
-              const SizedBox(height: 4),
-              Text('Tap to play',
-                  style: GoogleFonts.poppins(
-                      fontSize: 11, color: MaaColors.textMuted)),
-            ],
-          ),
-        ),
-      );
-    }
-
     if (_error) {
       return Container(
         height: 200,
@@ -2390,6 +2445,80 @@ class _VideoPostPlayerState extends State<VideoPostPlayer> {
             ),
           ),
         ],
+      ),
+    );
+  }
+}
+
+// ─── Isolated community particle widget ───────────────────────────────────────
+class _CommunityParticles extends StatefulWidget {
+  const _CommunityParticles();
+  @override
+  State<_CommunityParticles> createState() => _CommunityParticlesState();
+}
+
+class _CommunityParticlesState extends State<_CommunityParticles>
+    with TickerProviderStateMixin {
+  static const int _count = 10;
+  late final List<AnimationController> _controllers;
+  late final List<Animation<double>> _animations;
+
+  @override
+  void initState() {
+    super.initState();
+    _controllers = List.generate(
+      _count,
+      (i) => AnimationController(
+        vsync: this,
+        duration: Duration(seconds: 3 + (i % 4)),
+      )..repeat(reverse: true),
+    );
+    _animations = _controllers
+        .map((c) => Tween<double>(begin: 0, end: -20)
+            .animate(CurvedAnimation(parent: c, curve: Curves.easeInOut)))
+        .toList();
+  }
+
+  @override
+  void dispose() {
+    for (final c in _controllers) {
+      c.dispose();
+    }
+    super.dispose();
+  }
+
+  @override
+  Widget build(BuildContext context) {
+    final size = MediaQuery.of(context).size;
+    return RepaintBoundary(
+      child: IgnorePointer(
+        child: Stack(
+          children: List.generate(_count, (i) {
+            final random = i * 37 % 100;
+            final dotSize = 1.5 + (i % 3).toDouble();
+            final color = i % 3 == 0
+                ? MaaColors.pink.withAlpha(25)
+                : i % 3 == 1
+                    ? MaaColors.gold.withAlpha(20)
+                    : MaaColors.softPurple.withAlpha(25);
+            return Positioned(
+              left: (random * 3.6) % size.width,
+              top: (random * 5.2) % size.height,
+              child: AnimatedBuilder(
+                animation: _animations[i],
+                builder: (_, __) => Transform.translate(
+                  offset: Offset(0, _animations[i].value),
+                  child: Container(
+                    width: dotSize,
+                    height: dotSize,
+                    decoration:
+                        BoxDecoration(shape: BoxShape.circle, color: color),
+                  ),
+                ),
+              ),
+            );
+          }),
+        ),
       ),
     );
   }

@@ -15,7 +15,7 @@ import '../../providers/user_provider.dart';
 import '../../widgets/loading_overlay.dart';
 import '../../utils/error_helper.dart';
 import 'weekly_detail_screen.dart';
-import '../../l10n/app_localizations.dart';
+import 'package:flutter_gen/gen_l10n/app_localizations.dart';
 
 class PregnancyTrackerScreen extends StatefulWidget {
   const PregnancyTrackerScreen({super.key});
@@ -184,7 +184,7 @@ class _PregnancyTrackerScreenState extends State<PregnancyTrackerScreen> {
             child: ClipRRect(
               borderRadius: BorderRadius.circular(70),
               child: Image.asset(
-                'assets/images/weeks/week_$week.jpg',
+                'assets/images/weeks/week_${week < 4 ? 4 : (week > 41 ? 41 : week)}.jpg',
                 width: 140,
                 height: 140,
                 fit: BoxFit.cover,

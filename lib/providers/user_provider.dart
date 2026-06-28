@@ -5,8 +5,9 @@
 import 'package:flutter/foundation.dart';
 import 'package:shared_preferences/shared_preferences.dart';
 import '../models/user_model.dart';
-import '../services/insforge_service.dart';
+import '../services/maacare_backend_service.dart';
 import '../services/auth_service.dart';
+import '../services/bmi_helper.dart';
 import '../constants.dart';
 
 class UserProvider extends ChangeNotifier {
@@ -24,10 +25,32 @@ class UserProvider extends ChangeNotifier {
     try {
       // 1. Get current user ID from AuthService (SecureStorage)
       final userId = AuthService.instance.getCurrentUserId();
-      
+
       if (userId != null) {
         // 2. Fetch profile from database
-        _user = await InsForgeService.instance.fetchUser(userId);
+        _user = await MaaCareBackendService.instance.fetchUser(userId);
+
+        // 3. Auto-create profile for OAuth users who don't have a DB row yet
+        if (_user == null) {
+          final authUser = await MaaCareBackendService.instance.getCurrentUser();
+          final fallbackName = authUser?['name'] as String? ??
+              authUser?['email'] as String? ??
+              'Mama';
+          final defaultUser = UserModel(
+            id: userId,
+            name: fallbackName,
+            email: authUser?['email'] as String?,
+            userRole: '',
+            points: 0,
+            streak: 0,
+            language: 'en',
+            isPremium: false,
+            trialUsesLeft: 10,
+            createdAt: DateTime.now(),
+          );
+          await MaaCareBackendService.instance.upsertUser(defaultUser);
+          _user = defaultUser;
+        }
       } else {
         _user = null;
       }
@@ -42,7 +65,7 @@ class UserProvider extends ChangeNotifier {
   Future<void> createOrUpdateUser(UserModel user) async {
     _setLoading(true);
     try {
-      await InsForgeService.instance.upsertUser(user);
+      await MaaCareBackendService.instance.upsertUser(user);
       _user = user;
       _error = null;
 
@@ -66,7 +89,7 @@ class UserProvider extends ChangeNotifier {
     notifyListeners();
 
     try {
-      await InsForgeService.instance.updateMood(_user!.id, mood);
+      await MaaCareBackendService.instance.updateMood(_user!.id, mood);
       // Award mood points
       await addPoints(AppConstants.pointsPerMoodCheck);
     } catch (_) {
@@ -84,7 +107,7 @@ class UserProvider extends ChangeNotifier {
     notifyListeners();
 
     try {
-      await InsForgeService.instance.updatePoints(_user!.id, newPoints);
+      await MaaCareBackendService.instance.updatePoints(_user!.id, newPoints);
     } catch (_) {
       // Soft rollback
       _user = _user!.copyWith(points: oldPoints);
@@ -98,7 +121,7 @@ class UserProvider extends ChangeNotifier {
     notifyListeners();
 
     try {
-      await InsForgeService.instance.updatePremiumStatus(
+      await MaaCareBackendService.instance.updatePremiumStatus(
         userId: _user!.id,
         isPremium: true,
         planName: planName,
@@ -107,9 +130,70 @@ class UserProvider extends ChangeNotifier {
     } catch (_) {}
   }
 
+  Future<void> updateTrialUses(int count) async {
+    if (_user == null) return;
+    final oldUses = _user!.trialUsesLeft;
+    _user = _user!.copyWith(trialUsesLeft: count);
+    notifyListeners();
+
+    try {
+      await MaaCareBackendService.instance.updateTrialUses(_user!.id, count);
+    } catch (_) {
+      _user = _user!.copyWith(trialUsesLeft: oldUses);
+      notifyListeners();
+    }
+  }
+
+  Future<void> decrementTrialUses() async {
+    if (_user == null) return;
+    final currentUses = _user!.trialUsesLeft;
+    if (currentUses <= 0) return;
+    final newUses = currentUses - 1;
+    _user = _user!.copyWith(trialUsesLeft: newUses);
+    notifyListeners();
+
+    try {
+      await MaaCareBackendService.instance.updateTrialUses(_user!.id, newUses);
+    } catch (_) {
+      _user = _user!.copyWith(trialUsesLeft: currentUses);
+      notifyListeners();
+    }
+  }
+
   void updateUserLocally(UserModel user) {
     _user = user;
     notifyListeners();
+  }
+
+  Future<void> updateBmiMetrics({required double heightCm, required double weightKg}) async {
+    if (_user == null) return;
+
+    final bmiScore = BmiHelper.calculateBmi(heightCm: heightCm, weightKg: weightKg);
+    final weightStatus = BmiHelper.getBmiStatus(bmiScore);
+
+    final oldUser = _user;
+    _user = _user!.copyWith(heightCm: heightCm, weightKg: weightKg);
+    notifyListeners();
+
+    try {
+      await MaaCareBackendService.instance.updateBmiMetrics(
+        userId: _user!.id,
+        heightCm: heightCm,
+        weightKg: weightKg,
+      );
+      if (bmiScore > 0) {
+        await MaaCareBackendService.instance.logBmi(
+          userId: _user!.id,
+          bmiScore: bmiScore,
+          weightStatus: weightStatus,
+        );
+      }
+    } catch (e) {
+      debugPrint('updateBmiMetrics provider error: $e');
+      _user = oldUser;
+      notifyListeners();
+      rethrow;
+    }
   }
 
   void clearError() {

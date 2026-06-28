@@ -25,15 +25,15 @@ echo Running flutter pub get...
 call flutter pub get
 if %ERRORLEVEL% NEQ 0 (
     echo [WARNING] pub get failed. This might be the symlink issue.
-    echo Trying Web-Only workaround...
-    if exist "windows" (
-        rename "windows" "windows_temp"
-        call flutter pub get
-        set WINDOWS_HIDDEN=true
-    )
+    echo Trying Web-Only workaround by clearing windows symlinks...
+    if exist "windows\flutter\ephemeral\.plugin_symlinks" rmdir /s /q "windows\flutter\ephemeral\.plugin_symlinks"
+    call flutter config --no-enable-windows-desktop
+    call flutter clean
+    call flutter pub get
+    set WINDOWS_HIDDEN=true
     if %ERRORLEVEL% NEQ 0 (
         echo [FATAL] pub get failed even after workaround.
-        if defined WINDOWS_HIDDEN rename "windows_temp" "windows"
+        call flutter config --enable-windows-desktop
         pause
         exit /b 1
     )
@@ -51,8 +51,8 @@ if %ERRORLEVEL% NEQ 0 (
 
 :: Restore
 if defined WINDOWS_HIDDEN (
-    rename "windows_temp" "windows"
-    echo Restored windows folder.
+    call flutter config --enable-windows-desktop
+    echo Restored windows config.
 )
 
 :: Step 4: Verify
@@ -63,31 +63,14 @@ if not exist "build\web\index.html" (
 )
 
 :: Step 5: Deploy
-echo [5/5] Deploying build\web to InsForge...
-set INSFORGE_PROJECT_ID=fd1bcdc3-5e9a-4b0a-9ddf-f36db358ed9d
-set INSFORGE_API_KEY=ik_681e0acea5c4f9a7d6f8a524c4fc8fec
-set INSFORGE_API_BASE_URL=https://96if48kf.ap-southeast.insforge.app
+echo [5/5] Deploying build\web to Netlify...
+set NETLIFY_SITE_URL=https://rainbow-granita-b4981d.netlify.app
 
-:: Linking (using environment variables)
-echo Linking project...
-call npx -y @insforge/cli@latest link --project-id %INSFORGE_PROJECT_ID%
-
-:: Deploying (using environment variables)
-echo Uploading build\web...
-call npx -y @insforge/cli@latest deployments deploy build/web
+call npx netlify deploy --dir=build/web --prod
 
 if %ERRORLEVEL% NEQ 0 (
     echo.
-    echo [ERROR] Deployment failed. 
-    echo Checking if CLI needs login...
-    echo Trying fallback with explicit directory only...
-    call npx -y @insforge/cli@latest deployments deploy ./build/web
-)
-
-if %ERRORLEVEL% NEQ 0 (
-    echo.
-    echo [ERROR] Final deployment attempt failed.
-    echo Please verify your Project ID and API Key.
+    echo [ERROR] Deployment to Netlify failed.
     pause
     exit /b 1
 )
@@ -95,7 +78,7 @@ if %ERRORLEVEL% NEQ 0 (
 echo.
 echo ==========================================
 echo SUCCESS! Your app is now live at:
-echo %INSFORGE_API_BASE_URL%
+echo %NETLIFY_SITE_URL%
 echo ==========================================
 echo.
 echo Press any key to exit.

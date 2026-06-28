@@ -1,5 +1,5 @@
 // ============================================================
-//  InsForgeService – MaaCare Backend (REST Implementation)
+//  MaaCareBackendService – MaaCare Backend (REST Implementation)
 // ============================================================
 
 import 'dart:convert';
@@ -22,14 +22,14 @@ import 'dart:async';
 import 'auth_service.dart';
 import 'api_service.dart';
 
-class InsForgeService {
-  InsForgeService._();
-  static final InsForgeService instance = InsForgeService._();
+class MaaCareBackendService {
+  MaaCareBackendService._();
+  static final MaaCareBackendService instance = MaaCareBackendService._();
 
   String? _accessToken;
 
-  String get _baseUrl => AppConstants.insForgeUrl;
-  String get _anonKey => AppConstants.insForgeAnonKey;
+  String get _baseUrl => AppConstants.backendUrl;
+  String get _anonKey => AppConstants.backendAnonKey;
 
   Map<String, String> get _headers {
     final token = AuthService.instance.accessToken ?? _accessToken;
@@ -299,7 +299,7 @@ class InsForgeService {
         ..._headers,
         'Prefer': 'resolution=merge-duplicates',
       },
-      body: jsonEncode([user.toMap()]), // InsForge requires array
+      body: jsonEncode([user.toMap()]), // Backend requires array
     );
     if (response.statusCode >= 400) {
       throw Exception(
@@ -642,9 +642,25 @@ class InsForgeService {
           'user_id': userId,
           'symptoms': symptoms,
           'risk_level': riskLevel,
+          'created_at': DateTime.now().toIso8601String(),
         }
       ]),
     );
+  }
+
+  Future<List<SymptomCheckModel>> fetchSymptomChecks(String userId) async {
+    final url = Uri.parse(
+        '$_baseUrl/api/database/records/symptoms?user_id=eq.$userId&order=created_at.desc');
+    try {
+      final response = await http.get(url, headers: _headers);
+      if (response.statusCode == 200) {
+        final List data = ApiService.safeDecode(response);
+        return data.map((v) => SymptomCheckModel.fromMap(v)).toList();
+      }
+    } catch (e) {
+      debugPrint('fetchSymptomChecks error: $e');
+    }
+    return [];
   }
 
   // ─────────────────── Vaccinations ───────────────────
@@ -722,7 +738,7 @@ class InsForgeService {
         return null;
       }
     } catch (e, stack) {
-      debugPrint('InsForge upload error: $e\n$stack');
+      debugPrint('MaaCare Backend upload error: $e\n$stack');
       return null;
     }
   }
@@ -832,6 +848,21 @@ class InsForgeService {
         headers: _headers,
         body: jsonEncode([doctor.toMap()..remove('id')]),
       );
+      if ((response.statusCode == 200 || response.statusCode == 201) &&
+          doctor.avatarUrl != null &&
+          doctor.avatarUrl!.isNotEmpty) {
+        try {
+          final userUrl = Uri.parse('$_baseUrl/api/database/records/users?id=eq.${doctor.userId}');
+          await http.patch(
+            userUrl,
+            headers: _headers,
+            body: jsonEncode({'avatar_url': doctor.avatarUrl}),
+          );
+          debugPrint('Avatar synced to users table successfully');
+        } catch (e) {
+          debugPrint('Failed to sync avatar to users table: $e');
+        }
+      }
       return response.statusCode == 200 || response.statusCode == 201;
     } catch (e) {
       debugPrint('Doctor registration failed: $e');
@@ -883,6 +914,20 @@ class InsForgeService {
       debugPrint('Failed to update appointment status: $e');
       return false;
     }
+  }
+
+  Future<List<BookingModel>> fetchAppointmentsForPatient(String userId) async {
+    final urlStr =
+        '$_baseUrl/api/database/records/appointments?user_id=eq.$userId&order=appointment_date.desc';
+    final url = Uri.parse(urlStr);
+    try {
+      final response = await http.get(url, headers: _headers);
+      if (response.statusCode == 200) {
+        final List data = ApiService.safeDecode(response);
+        return data.map((b) => BookingModel.fromMap(b)).toList();
+      }
+    } catch (_) {}
+    return [];
   }
 
   Future<List<BookingModel>> fetchAppointmentsForDoctor(String doctorId) async {

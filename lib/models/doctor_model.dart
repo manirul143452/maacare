@@ -18,6 +18,10 @@ class DoctorModel {
   final bool isVerified;
   final String status; // 'pending', 'verified', 'rejected'
   final String clinicLocation;
+  final List<String> availableDays;
+  final int slotDurationMinutes;
+  final String dailyStartTime;
+  final String dailyEndTime;
 
   const DoctorModel({
     required this.id,
@@ -35,6 +39,10 @@ class DoctorModel {
     this.isVerified = false,
     this.status = 'pending',
     this.clinicLocation = 'Online / Clinic',
+    this.availableDays = const ['Monday', 'Tuesday', 'Wednesday', 'Thursday', 'Friday'],
+    this.slotDurationMinutes = 20,
+    this.dailyStartTime = '09:00:00',
+    this.dailyEndTime = '17:00:00',
   });
 
   factory DoctorModel.fromMap(Map<String, dynamic> map) {
@@ -48,12 +56,18 @@ class DoctorModel {
       fee: map['fee'] ?? '₹0',
       bio: map['bio'] ?? '',
       availableHours: map['available_hours'] ?? 'Consultation only',
-      avatarUrl: map['avatar_url'],
+      avatarUrl: map['profile_photo_url'] as String? ?? map['avatar_url'] as String?,
       licenseUrl: map['license_url'],
       emoji: map['emoji'] ?? '👩‍⚕️',
       isVerified: map['is_verified'] ?? false,
       status: map['status'] ?? 'pending',
       clinicLocation: map['clinic_location'] ?? 'Online / Clinic',
+      availableDays: map['available_days'] != null
+          ? List<String>.from(map['available_days'])
+          : const ['Monday', 'Tuesday', 'Wednesday', 'Thursday', 'Friday'],
+      slotDurationMinutes: map['slot_duration_minutes'] as int? ?? 20,
+      dailyStartTime: map['daily_start_time'] ?? '09:00:00',
+      dailyEndTime: map['daily_end_time'] ?? '17:00:00',
     );
   }
 
@@ -69,11 +83,16 @@ class DoctorModel {
       'bio': bio,
       'available_hours': availableHours,
       'avatar_url': avatarUrl,
+      'profile_photo_url': avatarUrl,
       'license_url': licenseUrl,
       'emoji': emoji,
       'is_verified': isVerified,
       'status': status,
       'clinic_location': clinicLocation,
+      'available_days': availableDays,
+      'slot_duration_minutes': slotDurationMinutes,
+      'daily_start_time': dailyStartTime,
+      'daily_end_time': dailyEndTime,
     };
   }
 
@@ -91,6 +110,10 @@ class DoctorModel {
     bool? isVerified,
     String? status,
     String? clinicLocation,
+    List<String>? availableDays,
+    int? slotDurationMinutes,
+    String? dailyStartTime,
+    String? dailyEndTime,
   }) {
     return DoctorModel(
       id: id,
@@ -108,6 +131,10 @@ class DoctorModel {
       isVerified: isVerified ?? this.isVerified,
       status: status ?? this.status,
       clinicLocation: clinicLocation ?? this.clinicLocation,
+      availableDays: availableDays ?? this.availableDays,
+      slotDurationMinutes: slotDurationMinutes ?? this.slotDurationMinutes,
+      dailyStartTime: dailyStartTime ?? this.dailyStartTime,
+      dailyEndTime: dailyEndTime ?? this.dailyEndTime,
     );
   }
 }

@@ -1,4 +1,4 @@
-// ignore_for_file: deprecated_member_use
+﻿// ignore_for_file: deprecated_member_use
 import 'package:flutter/material.dart';
 import 'dart:ui';
 import '../app_theme.dart';
@@ -32,7 +32,7 @@ class LoadingOverlay extends StatelessWidget {
               child: BackdropFilter(
                 filter: ImageFilter.blur(sigmaX: 5.0, sigmaY: 5.0),
                 child: Container(
-                  color: MaaColors.background.withOpacity(0.5),
+                  color: MaaColors.background.withValues(alpha: 0.5),
                   child: Center(
                     child: Container(
                       padding: const EdgeInsets.all(24),

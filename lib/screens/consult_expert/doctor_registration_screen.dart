@@ -7,7 +7,7 @@ import 'package:google_fonts/google_fonts.dart';
 import 'package:flutter_animate/flutter_animate.dart';
 import '../../app_theme.dart';
 import '../../models/doctor_model.dart';
-import '../../services/insforge_service.dart';
+import '../../services/maacare_backend_service.dart';
 import '../../widgets/maa_button.dart';
 import '../../widgets/loading_overlay.dart';
 import '../../utils/error_helper.dart';
@@ -71,7 +71,7 @@ class _DoctorRegistrationScreenState extends State<DoctorRegistrationScreen> {
     final sanitizedName = image.name.replaceAll(' ', '_').replaceAll(RegExp(r'[^a-zA-Z0-9_\.]'), '');
     final fileName = '${DateTime.now().millisecondsSinceEpoch}_$sanitizedName';
 
-    final url = await InsForgeService.instance.uploadFile(
+    final url = await MaaCareBackendService.instance.uploadFile(
       bucket: 'community_media',
       fileName: fileName,
       bytes: bytes,
@@ -138,11 +138,20 @@ class _DoctorRegistrationScreenState extends State<DoctorRegistrationScreen> {
       clinicLocation: _locationController.text.trim(),
     );
 
-    final success = await InsForgeService.instance.registerDoctor(doctor);
+    final success = await MaaCareBackendService.instance.registerDoctor(doctor);
+
+    if (success) {
+      await MaaCareBackendService.instance.updateUserRole(user.id, 'doctor');
+    }
 
     setState(() => _isLoading = false);
 
     if (success && mounted) {
+      try {
+        await context.read<UserProvider>().loadUser();
+      } catch (e) {
+        debugPrint('Failed to load user profile after doctor registration: $e');
+      }
       _showSuccessDialog();
     } else if (mounted) {
       ErrorHelper.showError(context, 'Registration failed. Please try again.');
@@ -256,7 +265,7 @@ class _DoctorRegistrationScreenState extends State<DoctorRegistrationScreen> {
                 content: Column(
                   children: [
                     _buildTextField(_feeController,
-                        'Consultation Fee (e.g. 500)', Icons.payments),
+                        'Consultation Fee (e.g. 500, or 0 for FREE)', Icons.payments),
                     _buildTextField(
                         _hoursController,
                         'Available Hours (e.g. Mon-Fri 9AM-5PM)',

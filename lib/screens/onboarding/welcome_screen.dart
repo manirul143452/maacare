@@ -10,7 +10,7 @@ import 'package:flutter_animate/flutter_animate.dart';
 import 'package:provider/provider.dart';
 import '../../app_theme.dart';
 import '../../providers/user_provider.dart';
-import '../../services/insforge_service.dart';
+import '../../services/maacare_backend_service.dart';
 
 class WelcomeScreen extends StatefulWidget {
   const WelcomeScreen({super.key});
@@ -40,7 +40,7 @@ class _WelcomeScreenState extends State<WelcomeScreen>
       if (!mounted) return;
 
       // isLoggedIn now checks token expiry, so this is bulletproof
-      if (!InsForgeService.instance.isLoggedIn) {
+      if (!MaaCareBackendService.instance.isLoggedIn) {
         // No valid session → go to Login/Signup
         Navigator.pushReplacementNamed(context, '/auth');
         return;
@@ -53,10 +53,21 @@ class _WelcomeScreenState extends State<WelcomeScreen>
       if (!mounted) return;
 
       if (userProvider.user != null) {
-        // Profile complete → go to home
-        Navigator.pushReplacementNamed(context, '/home');
+        final role = userProvider.user!.userRole;
+        if (role == 'doctor') {
+          Navigator.pushReplacementNamed(context, '/doctor_dashboard');
+        } else if (role == 'unmarried_girl') {
+          Navigator.pushReplacementNamed(context, '/period_dashboard');
+        } else if (role == 'mother') {
+          Navigator.pushReplacementNamed(context, '/mother_dashboard');
+        } else {
+          Navigator.pushReplacementNamed(context, '/role-selection');
+        }
+      } else if (MaaCareBackendService.instance.isLoggedIn) {
+        // Logged in (possibly via Google OAuth) but no profile row yet → role selection
+        Navigator.pushReplacementNamed(context, '/role-selection');
       } else {
-        // Logged in but no profile → go to onboarding
+        // Logged in but no profile → go to onboarding (email/password flow)
         Navigator.pushReplacementNamed(context, '/onboarding');
       }
     });
@@ -70,8 +81,10 @@ class _WelcomeScreenState extends State<WelcomeScreen>
 
   @override
   Widget build(BuildContext context) {
-    return Scaffold(
-      backgroundColor: MaaColors.background,
+    return PopScope(
+      canPop: false,
+      child: Scaffold(
+        backgroundColor: MaaColors.background,
       body: Stack(
         children: [
           // Dark gradient background
@@ -374,7 +387,7 @@ class _WelcomeScreenState extends State<WelcomeScreen>
           ),
         ],
       ),
-    );
+    ),);
   }
 
   Widget _buildEmoji(String emoji, int delayMs) {

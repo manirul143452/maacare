@@ -46,12 +46,31 @@
 	<key>UIApplicationSupportsIndirectInputEvents</key>
 	<true/>
 
+	<!-- Google Sign-in Section -->
+	<key>CFBundleURLTypes</key>
+	<array>
+		<dict>
+			<key>CFBundleTypeRole</key>
+			<string>Editor</string>
+			<key>CFBundleURLSchemes</key>
+			<array>
+				<!-- Replace this value with your REVERSED_CLIENT_ID from GoogleService-Info.plist -->
+				<string>com.googleusercontent.apps.YOUR_IOS_CLIENT_ID</string>
+			</array>
+		</dict>
+	</array>
+
 	<!-- MaaCare Privacy Permissions -->
 	<key>NSCameraUsageDescription</key>
-	<string>MaaCare needs camera access to help you share symptoms and prescriptions with AI and doctors.</string>
+	<string>MaaCare needs camera access exclusively for launching high-definition video consultation sessions with verified doctors and gynecologists.</string>
 	<key>NSPhotoLibraryUsageDescription</key>
 	<string>MaaCare needs photo library access to upload prescriptions and community posts.</string>
 	<key>NSMicrophoneUsageDescription</key>
-	<string>MaaCare needs microphone access if you wish to record videos for the community.</string>
+	<string>MaaCare needs microphone access exclusively for video consultations and recording audio during telehealth calls.</string>
+	<key>UIBackgroundModes</key>
+	<array>
+		<string>fetch</string>
+		<string>remote-notification</string>
+	</array>
 </dict>
 </plist>

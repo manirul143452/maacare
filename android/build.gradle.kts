@@ -1,7 +1,18 @@
+buildscript {
+    extra.set("kotlin_version", "1.9.24")
+}
+
 allprojects {
     repositories {
         google()
         mavenCentral()
+    }
+    configurations.all {
+        resolutionStrategy.eachDependency {
+            if (requested.group == "org.jetbrains.kotlin") {
+                useVersion("1.9.24")
+            }
+        }
     }
 }
 
@@ -15,6 +26,8 @@ subprojects {
 subprojects {
     project.evaluationDependsOn(":app")
 }
+
+
 
 tasks.register<Delete>("clean") {
     delete(rootProject.layout.buildDirectory)

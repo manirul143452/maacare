@@ -4,6 +4,8 @@
 // ============================================================
 
 import 'package:flutter/material.dart';
+import 'dart:typed_data';
+import 'dart:convert';
 import 'package:provider/provider.dart';
 import 'package:flutter_animate/flutter_animate.dart';
 import 'package:image_picker/image_picker.dart';
@@ -13,8 +15,13 @@ import '../../app_theme.dart';
 import '../../providers/user_provider.dart';
 import '../../providers/community_provider.dart';
 import '../../models/post_model.dart';
-import '../../services/insforge_service.dart';
+import '../../services/maacare_backend_service.dart';
 import '../community/parents_park_screen.dart';
+import '../home/widgets/bmi_card.dart';
+import 'package:cached_network_image/cached_network_image.dart';
+import 'unmarried_profile_view.dart';
+import 'doctor_profile_view.dart';
+import 'package:flutter_gen/gen_l10n/app_localizations.dart';
 
 class ProfileScreen extends StatefulWidget {
   const ProfileScreen({super.key});
@@ -64,7 +71,7 @@ class _ProfileScreenState extends State<ProfileScreen>
     if (user == null) return;
     setState(() => _loadingPosts = true);
     try {
-      final posts = await InsForgeService.instance.fetchPostsByUser(user.id);
+      final posts = await MaaCareBackendService.instance.fetchPostsByUser(user.id);
       if (mounted) setState(() => _myPosts = posts);
     } catch (_) {}
     if (mounted) setState(() => _loadingPosts = false);
@@ -96,50 +103,88 @@ class _ProfileScreenState extends State<ProfileScreen>
     }
   }
 
+  Uint8List? _localAvatarBytes;
+  String? _localAvatarExt;
+
   Future<void> _pickAvatar() async {
     final picker = ImagePicker();
     final file =
         await picker.pickImage(source: ImageSource.gallery, maxWidth: 512);
     if (file == null) return;
 
-    setState(() => _isUploadingAvatar = true);
     try {
       final bytes = await file.readAsBytes();
-      final ext = file.path.split('.').last;
-      final fileName = 'avatar_${DateTime.now().millisecondsSinceEpoch}.$ext';
+      String ext = 'jpg';
+      if (file.path.contains('.')) {
+        ext = file.path.split('.').last;
+      }
+      setState(() {
+        _localAvatarBytes = bytes;
+        _localAvatarExt = ext;
+      });
+    } catch (_) {
+      if (mounted) {
+        ScaffoldMessenger.of(context).showSnackBar(
+          const SnackBar(
+            content: Text('Failed to read image. Try again! 😅'),
+            backgroundColor: MaaColors.cardLight,
+          ),
+        );
+      }
+    }
+  }
 
-      if (!mounted) return;
-      final url = await context.read<CommunityProvider>().uploadMedia(
-            fileName,
-            bytes,
-            bucket: 'community_media',
-          );
+  Future<void> _saveProfile() async {
+    final provider = context.read<UserProvider>();
+    var user = provider.user;
+    if (user == null) return;
 
-      if (url != null && mounted) {
-        final provider = context.read<UserProvider>();
-        final user = provider.user;
-        if (user != null) {
-          final updatedUser = user.copyWith(avatarUrl: url);
-          await provider.createOrUpdateUser(updatedUser);
-          _confettiController.play();
-          if (mounted) {
-            ScaffoldMessenger.of(context).showSnackBar(
-              SnackBar(
-                content: const Text('Avatar updated! Beautiful! 💕'),
-                behavior: SnackBarBehavior.floating,
-                backgroundColor: MaaColors.cardLight,
-                shape: RoundedRectangleBorder(
-                    borderRadius: BorderRadius.circular(12)),
-              ),
+    setState(() => _isUploadingAvatar = true);
+
+    try {
+      if (_localAvatarBytes != null && _localAvatarExt != null) {
+        final fileName =
+            'avatar_${DateTime.now().millisecondsSinceEpoch}.$_localAvatarExt';
+            
+        final url = await context.read<CommunityProvider>().uploadMedia(
+              fileName,
+              _localAvatarBytes!,
+              bucket: 'community_media',
             );
-          }
+
+        if (url != null) {
+          user = user.copyWith(avatarUrl: url);
+        } else {
+          // Fallback to base64 if storage upload fails (e.g. CORS/bucket missing)
+          final base64String = base64Encode(_localAvatarBytes!);
+          final mimeType = _localAvatarExt == 'png' ? 'image/png' : 'image/jpeg';
+          user = user.copyWith(avatarUrl: 'data:$mimeType;base64,$base64String');
         }
+      }
+
+      await provider.createOrUpdateUser(user);
+      _confettiController.play();
+
+      if (mounted) {
+        setState(() {
+          _localAvatarBytes = null;
+          _isEditingName = false;
+        });
+        ScaffoldMessenger.of(context).showSnackBar(
+          SnackBar(
+            content: const Text('Profile saved successfully! 🌸'),
+            behavior: SnackBarBehavior.floating,
+            backgroundColor: MaaColors.cardLight,
+            shape: RoundedRectangleBorder(
+                borderRadius: BorderRadius.circular(12)),
+          ),
+        );
       }
     } catch (_) {
       if (mounted) {
         ScaffoldMessenger.of(context).showSnackBar(
           const SnackBar(
-            content: Text('Upload failed. Try again! 😅'),
+            content: Text('Save failed. Please try again! 😅'),
             backgroundColor: MaaColors.cardLight,
           ),
         );
@@ -224,6 +269,12 @@ class _ProfileScreenState extends State<ProfileScreen>
           Consumer<UserProvider>(
             builder: (ctx, provider, _) {
               final user = provider.user;
+              if (user != null && user.userRole == 'unmarried_girl') {
+                return const UnmarriedProfileView();
+              }
+              if (user != null && user.userRole == 'doctor') {
+                return const DoctorProfileView();
+              }
               return SingleChildScrollView(
                 child: Column(
                   children: [
@@ -232,6 +283,11 @@ class _ProfileScreenState extends State<ProfileScreen>
                     _buildPointsSection(user),
                     const SizedBox(height: 24),
                     _buildInfoCard(user),
+                    const SizedBox(height: 24),
+                    const Padding(
+                      padding: EdgeInsets.symmetric(horizontal: 20),
+                      child: BmiCard(),
+                    ),
                     const SizedBox(height: 24),
                     _buildBadgesSection(user),
                     const SizedBox(height: 24),
@@ -310,7 +366,22 @@ class _ProfileScreenState extends State<ProfileScreen>
                 ),
               ),
               const Spacer(),
-              const SizedBox(width: 44),
+              GestureDetector(
+                onTap: () => Navigator.pushNamed(context, '/edit_profile'),
+                child: Container(
+                  padding: const EdgeInsets.all(10),
+                  decoration: BoxDecoration(
+                    color: MaaColors.glassBackground,
+                    borderRadius: BorderRadius.circular(14),
+                    border: Border.all(color: MaaColors.glassBorder),
+                  ),
+                  child: const Icon(
+                    Icons.edit_rounded,
+                    color: MaaColors.textPrimary,
+                    size: 20,
+                  ),
+                ),
+              ),
             ],
           ),
           const SizedBox(height: 30),
@@ -359,18 +430,36 @@ class _ProfileScreenState extends State<ProfileScreen>
                             strokeWidth: 2,
                           ),
                         )
-                      : user?.avatarUrl != null
+                      : _localAvatarBytes != null
                           ? ClipOval(
-                              child: Image.network(
-                                user!.avatarUrl!,
+                              child: Image.memory(
+                                _localAvatarBytes!,
                                 fit: BoxFit.cover,
                                 width: 120,
                                 height: 120,
-                                errorBuilder: (_, __, ___) =>
-                                    _buildInitial(user),
                               ),
                             )
-                          : _buildInitial(user),
+                          : user?.avatarUrl != null
+                              ? ClipOval(
+                                  child: user!.avatarUrl!.startsWith('data:image')
+                                      ? Image.memory(
+                                          base64Decode(user!.avatarUrl!.split(',').last),
+                                          fit: BoxFit.cover,
+                                          width: 120,
+                                          height: 120,
+                                          errorBuilder: (_, __, ___) => _buildInitial(user),
+                                        )
+                                      : CachedNetworkImage(
+                                          imageUrl: user!.avatarUrl!,
+                                          fit: BoxFit.cover,
+                                          width: 120,
+                                          height: 120,
+                                          memCacheWidth: 300,
+                                          placeholder: (ctx, url) => _buildInitial(user),
+                                          errorWidget: (ctx, url, error) => _buildInitial(user),
+                                        ),
+                                )
+                              : _buildInitial(user),
                 ),
               ).animate().scale(curve: Curves.elasticOut, duration: 800.ms),
 
@@ -1072,12 +1161,21 @@ class _ProfileScreenState extends State<ProfileScreen>
                                         fit: BoxFit.cover,
                                         errorBuilder: (_, __, ___) => const SizedBox(),
                                       )
-                                    : Image.network(
-                                        post.imageUrl!,
+                                    : CachedNetworkImage(
+                                        imageUrl: post.imageUrl!,
                                         height: 150,
                                         width: double.infinity,
                                         fit: BoxFit.cover,
-                                        errorBuilder: (_, __, ___) => const SizedBox(),
+                                        memCacheWidth: 400,
+                                        placeholder: (ctx, url) => Container(
+                                          height: 150,
+                                          color: MaaColors.cardLight,
+                                          child: const Center(
+                                            child: CircularProgressIndicator(
+                                                color: MaaColors.pink, strokeWidth: 2),
+                                          ),
+                                        ),
+                                        errorWidget: (ctx, url, error) => const SizedBox(),
                                       ),
                           ),
                         ),
@@ -1098,7 +1196,7 @@ class _ProfileScreenState extends State<ProfileScreen>
                           const Spacer(),
                           GestureDetector(
                             onTap: () async {
-                              final ok = await InsForgeService.instance.deletePost(post.id);
+                              final ok = await MaaCareBackendService.instance.deletePost(post.id);
                               if (ok && mounted) {
                                 setState(() => _myPosts.removeWhere((p) => p.id == post.id));
                                 ScaffoldMessenger.of(context).showSnackBar(
@@ -1146,10 +1244,17 @@ class _ProfileScreenState extends State<ProfileScreen>
   }
 
   Widget _buildActionButtons() {
+    final l10n = AppLocalizations.of(context);
     return Container(
       margin: const EdgeInsets.symmetric(horizontal: 20),
       child: Column(
         children: [
+          _buildActionButton(
+            'Save Profile 💾',
+            _saveProfile,
+            MaaColors.success,
+          ),
+          const SizedBox(height: 12),
           _buildActionButton(
             'Sync Data 🔄',
             () async {
@@ -1170,14 +1275,14 @@ class _ProfileScreenState extends State<ProfileScreen>
           ),
           const SizedBox(height: 12),
           _buildActionButton(
-            'Settings ⚙️',
+            '${l10n.settings} ⚙️',
             () => Navigator.pushNamed(context, '/settings'),
             MaaColors.softPurple,
             outlined: true,
           ),
           const SizedBox(height: 12),
           _buildActionButton(
-            'Help Center 🆘',
+            '${l10n.helpCenter} 🆘',
             () => Navigator.pushNamed(context, '/help'),
             MaaColors.lightBlue,
             outlined: true,

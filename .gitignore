@@ -11,6 +11,12 @@
 .svn/
 .swiftpm/
 migrate_working_dir/
+hs_err_pid*
+replay_pid*
+*.lnk
+Untitled-*.txt
+build_error.txt
+build_log*.txt
 
 # IntelliJ related
 *.iml
@@ -58,3 +64,6 @@ app.*.map.json
 .roo
 .trae
 .windsurf
+.aider*
+.cursor*
+.devin*

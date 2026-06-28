@@ -8,7 +8,7 @@ A complete Flutter motherhood support app for expectant and new mothers. Availab
 ## ✨ Features
 
 | Feature | Description |
-|---|---|
+| :--- | :--- |
 | 🤱 Onboarding | 3-step setup with confetti animation |
 | 🏠 Home Dashboard | Baby week tracker, mood log, tips, gamification |
 | 🤖 AI Companion | 24/7 empathetic chat (InsForge AI) |
@@ -21,6 +21,7 @@ A complete Flutter motherhood support app for expectant and new mothers. Availab
 | 🍱 Nutrition Guide | Indian recipes + calorie calculator |
 | 💜 Family Planning | Fertility tips + contraception comparison |
 | 👩 Profile | Points/badges (Super Mom!), settings, language |
+| 🔒 Permission Gate | Sequential post-onboarding permission gate + runtime guards for telehealth camera/microphone |
 
 ---
 
@@ -39,8 +40,8 @@ flutter pub get
 ### 2. Set up your API keys
 Edit `lib/constants.dart`:
 ```dart
-static const String supabaseUrl      = 'https://89wh46c8.ap-southeast.insforge.app';
-static const String supabaseAnonKey  = 'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJzdWIiOiIxMjM0NTY3OC0xMjM0LTU2NzgtOTBhYi1jZGVmMTIzNDU2NzgiLCJlbWFpbCI6ImFub25AaW5zZm9yZ2UuY29tIiwicm9sZSI6ImFub24iLCJpYXQiOjE3NzExMTI3MDR9.D4sC4V-O1_n-e_w2-k-y-9-8-7-6-5-4-3-2-1-0-a-b-c-d-e-f-g-h-i-j-k-l-m';
+static String get insForgeUrl => kIsWeb ? 'YOUR_WEB_URL' : 'YOUR_MOBILE_URL';
+static const String insForgeAnonKey  = 'YOUR_INSFORGE_ANON_KEY';
 static const String razorpayKey      = 'YOUR_RAZORPAY_KEY_ID';
 ```
 
@@ -90,7 +91,7 @@ lib/
 ## 🎨 Design System
 
 | Token | Value |
-|---|---|
+| :--- | :--- |
 | Primary Pink | `#FFB6C1` |
 | Peach | `#FFDAB9` |
 | Deep Pink (accent) | `#FF8FAB` |

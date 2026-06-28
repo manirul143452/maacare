@@ -18,10 +18,21 @@ class InsForgeRealtimeClient {
     if (_channel != null || _isConnecting) return;
     _isConnecting = true;
     
-    final wsUrl = Uri.parse('${AppConstants.insForgeUrl.replaceFirst('https', 'wss')}/realtime/v1/websocket?apikey=${AppConstants.insForgeAnonKey}&v=1.0.0');
+    // Connect to the standard realtime websocket path: /realtime/v1/websocket
+    final wsUrl = Uri.parse('${AppConstants.backendUrl.replaceFirst('https', 'wss')}/realtime/v1/websocket?apikey=${AppConstants.backendAnonKey}&v=1.0.0');
     try {
       _channel = WebSocketChannel.connect(wsUrl);
       
+      _channel!.ready.catchError((e) {
+        debugPrint('Realtime WS Ready Error: $e');
+        _handleReconnect();
+      });
+
+      // Also catch any errors on the sink to prevent cascading Unhandled Promise Rejections
+      _channel!.sink.done.catchError((e) {
+        debugPrint('Realtime WS Sink Done Error: $e');
+      });
+
       _channel!.stream.listen(
         (message) {
           _reconnectDelay = 1000; // Reset delay on success

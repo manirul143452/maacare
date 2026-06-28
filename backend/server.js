@@ -52,7 +52,6 @@ const PORT = process.env.PORT || 5000;
 const MONGO_URI = process.env.MONGO_URI || 'mongodb://localhost:27017/maacare';
 const JWT_SECRET = process.env.JWT_SECRET;
 const S3_BUCKET = process.env.S3_BUCKET_NAME;
-const AWS_REGION = process.env.AWS_REGION || 'ap-south-1';
 
 if (!JWT_SECRET) {
   console.error('FATAL: JWT_SECRET environment variable is not set.');
@@ -89,7 +88,7 @@ app.use(express.json({ limit: '10mb' }));
 app.use(express.urlencoded({ extended: true, limit: '10mb' }));
 
 // ── Request Logging ──────────────────────────────────────────────
-app.use((req, res, next) => {
+app.use((req, _res, next) => {
   console.log(`[${new Date().toISOString()}] ${req.method} ${req.url}`);
   next();
 });
@@ -111,7 +110,7 @@ if (USE_S3 && s3Client && multerS3) {
 } else {
   // Local disk fallback
   storageEngine = multer.diskStorage({
-    destination: (req, file, cb) => {
+    destination: (req, _file, cb) => {
       const bucket = req.params.bucket || 'default';
       const uploadPath = path.join(__dirname, 'uploads', bucket);
       fs.mkdirSync(uploadPath, { recursive: true });
@@ -155,7 +154,7 @@ function setupWebSocket(server) {
     ws.on('message', (message) => {
       try {
         const data = JSON.parse(message);
-        const { topic, event, payload, ref } = data;
+        const { topic, event, ref } = data;
 
         if (event === 'phx_join') {
           ws.subscribedTopics.add(topic);
@@ -323,7 +322,7 @@ function mapDoc(doc) {
 // 0. HEALTH CHECK
 // ────────────────────────────────────────────────────────────────
 
-app.get('/health', (req, res) => {
+app.get('/health', (_req, res) => {
   res.status(200).json({
     status: 'ok',
     service: 'maacare-backend',
@@ -806,7 +805,7 @@ app.get('/api/storage/buckets/:bucket/objects/:file', (req, res) => {
     const command = new GetObjectCommand({ Bucket: S3_BUCKET, Key: `${req.params.bucket}/${req.params.file}` });
     getSignedUrl(s3Client, command, { expiresIn: 3600 }).then(url => {
       res.redirect(url);
-    }).catch(err => {
+    }).catch(_err => {
       res.status(404).json({ error: 'File not found' });
     });
   } else {
@@ -1046,8 +1045,6 @@ app.post('/functions/razorpay', authenticateToken, async (req, res) => {
 // 5. AI ENDPOINTS
 // ────────────────────────────────────────────────────────────────
 
-const https = require('https');
-
 // ── AI Provider: Gemini 2.5 Flash (Primary) + NVIDIA NIM (Fallback) ──────────
 const GEMINI_API_KEY = process.env.GEMINI_API_KEY || 'AIzaSyBelxMKHhhdeOaO22DzPCPrGD1XKOEiTpc';
 const NVIDIA_API_KEY = process.env.NVIDIA_API_KEY || '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';
@@ -1213,6 +1210,6 @@ app.post('/functions/generate_nutrition_plan', (req, res) => {
   }
 });
 
-app.post('/functions/symptom_webhook', (req, res) => {
+app.post('/functions/symptom_webhook', (_req, res) => {
   res.status(200).json({ success: true, message: 'Webhook processed successfully' });
 });

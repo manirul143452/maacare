@@ -7,6 +7,7 @@ import 'package:flutter/material.dart';
 import 'package:provider/provider.dart';
 import 'package:shared_preferences/shared_preferences.dart';
 import 'package:flutter_animate/flutter_animate.dart';
+import 'package:flutter/foundation.dart' show kIsWeb;
 import '../app_theme.dart';
 import '../providers/user_provider.dart';
 import '../services/auth_service.dart';
@@ -53,6 +54,8 @@ class _SplashScreenState extends State<SplashScreen>
 
   Future<void> _loadState() async {
     debugPrint('MAACARE_DEBUG: _loadState starting');
+    debugPrint('MAACARE_DEBUG: Uri.base is ${Uri.base.toString()}');
+    debugPrint('MAACARE_DEBUG: Uri.base.fragment is ${Uri.base.fragment}');
     
     // Initialize Auth Service (SecureStorage, Auto-refresh)
     try {
@@ -60,6 +63,46 @@ class _SplashScreenState extends State<SplashScreen>
         debugPrint('MAACARE_DEBUG: AuthService init timed out after 5s');
       });
       debugPrint('MAACARE_DEBUG: AuthService initialized');
+
+      if (kIsWeb) {
+        final uri = Uri.base;
+        debugPrint('MAACARE_DEBUG: Checking web URL for OAuth tokens: ${uri.toString()}');
+        
+        // Check for 'code' or 'insforge_code' in query parameters (PKCE Flow)
+        if (uri.queryParameters.containsKey('code') || uri.queryParameters.containsKey('insforge_code')) {
+          final code = uri.queryParameters['code'] ?? uri.queryParameters['insforge_code']!;
+          debugPrint('MAACARE_DEBUG: Web OAuth code detected, exchanging...');
+          final result = await AuthService.instance.exchangeOAuthCodeWeb(code);
+          if (result.success) {
+            debugPrint('MAACARE_DEBUG: Web OAuth code exchanged successfully');
+          } else {
+            debugPrint('MAACARE_DEBUG: Web OAuth code exchange failed: ${result.error}');
+          }
+        } 
+        // Check for 'access_token' in fragment or query (Implicit Flow / Supabase Default)
+        else {
+          String? accessToken;
+          String? refreshToken;
+
+          // Supabase appends tokens as fragment (e.g., #access_token=xxx&refresh_token=yyy)
+          if (uri.fragment.contains('access_token=')) {
+            final uriFragment = Uri.splitQueryString(uri.fragment);
+            accessToken = uriFragment['access_token'];
+            refreshToken = uriFragment['refresh_token'];
+          } else if (uri.queryParameters.containsKey('access_token')) {
+            accessToken = uri.queryParameters['access_token'];
+            refreshToken = uri.queryParameters['refresh_token'];
+          }
+
+          if (accessToken != null) {
+            debugPrint('MAACARE_DEBUG: Web OAuth token detected in URL fragment/query, saving session...');
+            await AuthService.instance.saveSessionWeb(accessToken, refreshToken: refreshToken);
+            // Re-initialize to load the newly saved session
+            await AuthService.instance.initialize();
+            debugPrint('MAACARE_DEBUG: Session saved and initialized successfully');
+          }
+        }
+      }
     } catch (e) {
       debugPrint('MAACARE_DEBUG: AuthService init error: $e');
     }
@@ -131,7 +174,7 @@ class _SplashScreenState extends State<SplashScreen>
                     showAcceptButton: true,
                     onAccept: () async {
                       if (!context.mounted) return;
-                      Navigator.pushReplacementNamed(context, '/onboarding');
+                      Navigator.pushReplacementNamed(context, '/auth');
                     },
                   ),
                   transitionsBuilder:
@@ -152,8 +195,17 @@ class _SplashScreenState extends State<SplashScreen>
       return;
     }
 
-    // Use AuthService to check authentication status
-    final isAuthenticated = AuthService.instance.isLoggedIn;
+    // Use restoreSession() – this handles process-kill + background resume correctly.
+    // It: (1) checks in-memory token, (2) reloads from SecureStorage if needed,
+    // (3) refreshes near-expiry tokens, before making any navigation decision.
+    debugPrint('MAACARE_DEBUG: Calling restoreSession()...');
+    final isAuthenticated = await AuthService.instance.restoreSession().timeout(
+      const Duration(seconds: 8),
+      onTimeout: () {
+        debugPrint('MAACARE_DEBUG: restoreSession timed out – treating as unauthenticated');
+        return false;
+      },
+    );
     final userId = AuthService.instance.getCurrentUserId();
 
     debugPrint('MAACARE_DEBUG: Auth status - isAuthenticated: $isAuthenticated, userId: $userId');
@@ -168,8 +220,8 @@ class _SplashScreenState extends State<SplashScreen>
         await userProvider.loadUser().timeout(const Duration(seconds: 5), onTimeout: () {
           debugPrint('MAACARE_DEBUG: loadUser timed out after 5s');
         });
-        debugPrint('MAACARE_DEBUG: User loaded, navigating to home');
-        
+        debugPrint('MAACARE_DEBUG: User loaded, checking user role for dashboard routing...');
+
         // Sync OneSignal Player ID to backend for push notifications
         debugPrint('MAACARE_DEBUG: Syncing OneSignal token...');
         await PushNotificationService.instance.syncPlayerIdToBackend(userId);
@@ -177,11 +229,42 @@ class _SplashScreenState extends State<SplashScreen>
         debugPrint('MAACARE_DEBUG: Error loading user details: $e');
       }
       if (!mounted) return;
-      Navigator.pushReplacementNamed(context, '/home');
+      if (userProvider.user != null) {
+        final role = userProvider.user!.userRole;
+        if (role == 'doctor') {
+          Navigator.pushReplacementNamed(context, '/doctor_dashboard');
+        } else if (role == 'unmarried_girl') {
+          Navigator.pushReplacementNamed(context, '/period_dashboard');
+        } else if (role == 'mother') {
+          Navigator.pushReplacementNamed(context, '/home');
+        } else {
+          Navigator.pushReplacementNamed(context, '/role-selection');
+        }
+      } else {
+        Navigator.pushReplacementNamed(context, '/role-selection');
+      }
     } else {
-      debugPrint('MAACARE_DEBUG: Onboarding not done, navigating to onboarding');
+      debugPrint('MAACARE_DEBUG: Onboarding not done, checking if user role exists...');
+      try {
+        await userProvider.loadUser().timeout(const Duration(seconds: 5), onTimeout: () {
+          debugPrint('MAACARE_DEBUG: loadUser timed out after 5s');
+        });
+      } catch (_) {}
       if (!mounted) return;
-      Navigator.pushReplacementNamed(context, '/onboarding');
+      if (userProvider.user != null && userProvider.user!.userRole.isNotEmpty && userProvider.user!.userRole != 'unset') {
+        final role = userProvider.user!.userRole;
+        if (role == 'doctor') {
+          Navigator.pushReplacementNamed(context, '/doctor_dashboard');
+        } else if (role == 'unmarried_girl') {
+          Navigator.pushReplacementNamed(context, '/period_dashboard');
+        } else {
+          Navigator.pushReplacementNamed(context, '/home');
+        }
+      } else if (AuthService.instance.isLoggedIn) {
+        Navigator.pushReplacementNamed(context, '/role-selection');
+      } else {
+        Navigator.pushReplacementNamed(context, '/onboarding');
+      }
     }
   }
 
@@ -378,12 +461,14 @@ class _SplashScreenState extends State<SplashScreen>
                                 duration: 2000.ms,
                                 color: MaaColors.pink.withAlpha(100)),
                         const SizedBox(width: 12),
-                        Text(
-                          _curiosityTeaser,
-                          style: const TextStyle(
-                            color: MaaColors.textPrimary,
-                            fontSize: 13,
-                            fontWeight: FontWeight.w500,
+                        Expanded(
+                          child: Text(
+                            _curiosityTeaser,
+                            style: const TextStyle(
+                              color: MaaColors.textPrimary,
+                              fontSize: 13,
+                              fontWeight: FontWeight.w500,
+                            ),
                           ),
                         ),
                       ],

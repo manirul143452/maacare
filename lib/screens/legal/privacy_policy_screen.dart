@@ -9,7 +9,7 @@ import 'package:google_fonts/google_fonts.dart';
 import 'package:flutter_animate/flutter_animate.dart';
 import '../../app_theme.dart';
 import '../../widgets/maa_button.dart';
-import '../../l10n/app_localizations.dart';
+import 'package:flutter_gen/gen_l10n/app_localizations.dart';
 
 class PrivacyPolicyScreen extends StatefulWidget {
   final bool showAcceptButton;
@@ -140,7 +140,7 @@ class _PrivacyPolicyScreenState extends State<PrivacyPolicyScreen> {
                   child: Column(
                     children: [
                       Text(
-                        '📅 Last Updated: April 13, 2025',
+                        l10n.privacyLastUpdated,
                         style: GoogleFonts.poppins(
                           fontSize: 12,
                           color: colorScheme.onSurface.withAlpha(120),
@@ -148,7 +148,7 @@ class _PrivacyPolicyScreenState extends State<PrivacyPolicyScreen> {
                       ),
                       const SizedBox(height: 4),
                       Text(
-                        'MaaCare Health Technologies Pvt. Ltd.',
+                        'Maa Park Production (formerly Maacare Health Technology Pvt. Ltd.)',
                         style: GoogleFonts.poppins(
                           fontSize: 12,
                           fontWeight: FontWeight.w600,

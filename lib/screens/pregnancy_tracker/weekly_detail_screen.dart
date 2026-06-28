@@ -12,8 +12,48 @@ class WeeklyDetailScreen extends StatelessWidget {
     final info = getPregnancyInfoForWeek(week);
     if (info == null) {
       return Scaffold(
-        appBar: AppBar(title: const Text('Week Detail')),
-        body: const Center(child: Text('Information not available.')),
+        backgroundColor: MaaColors.background,
+        appBar: AppBar(
+          title: const Text('Week Detail'),
+          backgroundColor: MaaColors.cardDark,
+          elevation: 0,
+        ),
+        body: Center(
+          child: Padding(
+            padding: const EdgeInsets.all(24.0),
+            child: Column(
+              mainAxisAlignment: MainAxisAlignment.center,
+              children: [
+                const Text('⚠️', style: TextStyle(fontSize: 48)),
+                const SizedBox(height: 16),
+                const Text(
+                  'Information not available.',
+                  style: TextStyle(color: MaaColors.white, fontSize: 18, fontWeight: FontWeight.bold),
+                  textAlign: TextAlign.center,
+                ),
+                const SizedBox(height: 8),
+                const Text(
+                  'We couldn\'t load the detailed guideline for this week.',
+                  style: TextStyle(color: MaaColors.textGrey, fontSize: 14),
+                  textAlign: TextAlign.center,
+                ),
+                const SizedBox(height: 24),
+                ElevatedButton.icon(
+                  onPressed: () => Navigator.pop(context),
+                  icon: const Icon(Icons.arrow_back_rounded),
+                  label: const Text('Go Back'),
+                  style: ElevatedButton.styleFrom(
+                    backgroundColor: MaaColors.deepPink,
+                    foregroundColor: Colors.white,
+                    shape: RoundedRectangleBorder(
+                      borderRadius: BorderRadius.circular(12),
+                    ),
+                  ),
+                ),
+              ],
+            ),
+          ),
+        ),
       );
     }
 
@@ -189,10 +229,11 @@ class WeeklyDetailScreen extends StatelessWidget {
   }
 
   Widget _buildImageHeader(BuildContext context, Map<String, String> info) {
+    final imageHeight = (MediaQuery.of(context).size.height * 0.35).clamp(240.0, 320.0);
     return Stack(
       children: [
         Container(
-          height: 350,
+          height: imageHeight,
           width: double.infinity,
           decoration: BoxDecoration(
             color: MaaColors.cardDark,
@@ -218,7 +259,7 @@ class WeeklyDetailScreen extends StatelessWidget {
           bottom: 0,
           left: 0,
           right: 0,
-          height: 150,
+          height: imageHeight * 0.45,
           child: Container(
             decoration: BoxDecoration(
               gradient: LinearGradient(

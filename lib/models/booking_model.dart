@@ -13,6 +13,7 @@ class BookingModel {
   final String paymentStatus;
   final String meetingLink;
   final String amount;
+  final String? userRole;
   final DateTime createdAt;
 
   const BookingModel({
@@ -26,6 +27,7 @@ class BookingModel {
     required this.paymentStatus,
     required this.meetingLink,
     required this.amount,
+    this.userRole,
     required this.createdAt,
   });
 
@@ -43,6 +45,7 @@ class BookingModel {
       paymentStatus: map['payment_status'] ?? 'pending',
       meetingLink: map['meeting_link'] ?? '',
       amount: map['amount'] ?? '₹0',
+      userRole: map['user_role']?.toString(),
       createdAt: map['created_at'] != null 
           ? DateTime.parse(map['created_at']) 
           : DateTime.now(),
@@ -61,7 +64,9 @@ class BookingModel {
       'payment_status': paymentStatus,
       'meeting_link': meetingLink,
       'amount': amount,
+      if (userRole != null) 'user_role': userRole,
       'created_at': createdAt.toIso8601String(),
     };
   }
 }
+
